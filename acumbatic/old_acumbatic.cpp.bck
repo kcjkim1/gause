@@ -1,0 +1,1128 @@
+#include <popt.h>
+#include <iostream>
+#include <string>
+#include <dirent.h>
+#include "cvutils.h"
+#include <fann.h>
+#include <floatfann.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+
+using namespace std; 
+
+//Constants
+#define RGB 0
+#define HSV 1
+#define YCBCR 2
+#define XYZ 3
+#define HLS 4
+#define LAB 5
+#define LUV 6
+
+#define NO_COLORSPACES 7
+
+#define MAX_DIRECTORY_SIZE 256
+#define MAX_TEST_IMAGES 100
+
+#define IMG_EXT 6
+#define MSK_EXT 2
+
+#define TRAIN_VALIDATION_RATIO 2
+
+#define IS_STUFF 255
+#define IS_NON_STUFF 0
+#define STUFF_RESULT 1.0
+#define NON_STUFF_RESULT -1.0
+
+#define MIN_INPUT_RANGE -1.0
+#define MAX_INPUT_RANGE 1.0
+
+#define TEMP_TRAIN_FILE "temptrain.temp"
+#define TEMP_VALIDATION_FILE "temptest.temp"
+
+#define TRAIN_FILE "train.data"
+#define VALIDATION_FILE "validation.data"
+
+#define ANN_FILE_PREFIX "ann"
+#define METRIX_FILE_PREFIX "mtr"
+#define ANN_FILE_SEP "_"
+#define METRIX_FILE_SEP "_"
+
+#define CONFIG_FILE_NAME "network.cfg"
+#define NETWORK_FILE_NAME "network.net"
+#define LOCAL_ANN_FILE_NAME "localann.net"
+#define MINIMUM_MSE_NET_FILE_NAME "bestSoFar.net"
+
+#define FIXED_LEVELS 256
+#define FIXED_WINDOW 1
+#define FIXED_HIDDEN 6
+
+
+//Global Variables
+char trainingDirectory[MAX_DIRECTORY_SIZE];
+char testDirectory[MAX_DIRECTORY_SIZE];
+char* supportedImgExtensions[IMG_EXT];
+char* supportedMskExtensions[MSK_EXT];
+int minimumHidden, maximumHidden, maxEpochs, epochsBetweenReports, trainingIterations, minimumNumberLevels, maximumWindowSize;
+double thresholdStep;
+bool lightFlag = false;
+
+//CAllback function for directory iteration
+struct ImgResult {
+	long stuff;
+	long nonStuff;
+	long tp;
+	long fp;
+	long tn;
+	long fn;
+	long dunno;
+};
+
+typedef long (*iterateOnSetCallBack)( string , string , FILE* , FILE* , int , int, int, double, struct fann*, ImgResult*, int );
+
+int processOptions(int argc, const char* argv[]) {
+	struct poptOption table[] = {
+		{"training-directory", 't', POPT_ARG_STRING, trainingDirectory, 't',
+		 "The directory containing the training set to be used during nn training.", "A valid directory"},
+		{"minimum-hidden-neurons", 'h', POPT_ARG_INT, &minimumHidden, 'h',
+		 "Minimum number of hidden neurons.", "A valid integer."},
+		{"maximum-hidden-neurons", 'H', POPT_ARG_INT, &maximumHidden, 'H',
+		 "Maximum number of hidden neurons.", "A valid integer."},		 
+		{"maximum-epochs", 'e', POPT_ARG_INT, &maxEpochs, 'e',
+		 "Maximum number of training epochs", "A valid integer."},
+		{"epochs-between-reports", 'r', POPT_ARG_INT, &epochsBetweenReports, 'r',
+		 "Frequency of reports", "A valid integer."},
+		{"test-directory", 'd', POPT_ARG_STRING, testDirectory, 'd',
+		 "The directory containing the test set to be used during nn metrics extraction.", "A valid directory"},
+		{"training-iterations", 'i', POPT_ARG_INT, &trainingIterations, 'i',
+		 "The number of times each configuration will be trained.", "A valid integer"},
+		{"minimum-number-levels", 'c', POPT_ARG_INT, &minimumNumberLevels, 'c',
+		 "The minimum number of quantization levels", "A valid integer (power of two)"},
+		{"maximum-window-size", 'w', POPT_ARG_INT, &maximumWindowSize, 'w',
+		 "The maximum window size", "A valid integer (power of two)"},
+		{"threshold-step", 's', POPT_ARG_DOUBLE, &thresholdStep, 's',
+		 "The threshold step", "A valid number"},
+		{"light-mode", 'l', POPT_ARG_NONE, NULL, 'l',
+		 "Instructs to function in light mode", NULL},
+		 POPT_TABLEEND 
+	};
+	
+	poptContext ctx = poptGetContext(NULL, argc, argv, table, 0);
+	
+	int rc = 0;
+	while ( ( rc = poptGetNextOpt( ctx ) ) >= 0 ) {
+		switch (rc) {
+			case 't': 
+			  strcpy( trainingDirectory, poptGetOptArg(ctx));
+			  cout << "Set Training Directory to " << trainingDirectory << endl;
+			  break;
+			 case 'd': 
+			  strcpy( testDirectory, poptGetOptArg(ctx));
+			  cout << "Set Test Directory to " << testDirectory << endl;
+			  break;
+			 case 'l': 
+			  lightFlag = true;
+			  break;
+			default:
+			  cout << "Set " << (char)rc << " parameter to " << poptGetOptArg(ctx) << endl;
+		}
+	}
+	
+	return 0;
+}
+
+int getConvertion( int colorspace ) {
+	switch (colorspace) {
+		case HSV: return CV_BGR2HSV; break;
+		case YCBCR: return CV_BGR2YCrCb; break;
+		case XYZ: return CV_BGR2XYZ; break;
+		case HLS: return CV_BGR2HLS; break;
+		case LAB: return CV_BGR2Lab; break;
+		case LUV: return CV_BGR2Luv; break;
+		default : return -1;
+	}
+}
+
+void getChannels( IplImage* converted, int i, int j, int colorspace, double *ch1, double *ch2, double *ch3 ) {
+	switch (colorspace) {
+		case RGB:
+		  (*ch1) = getRed(converted, i, j) / 255.0;
+	      (*ch2) = getGreen(converted, i, j) / 255.0;
+	      (*ch3) = getBlue(converted, i, j) / 255.0;
+	      break; 
+	    case HSV:
+	      (*ch1) = getHue(converted, i, j) / 360.0;;
+	      (*ch2) = getSaturation( converted, i, j );
+	      (*ch3) = getValue( converted, i, j );
+	      break;
+	    case YCBCR:
+	      (*ch1) = getLuma(converted, i, j) / 255.0;
+		  (*ch2) = getChromaBlue( converted, i, j ) / 255.0;
+		  (*ch3) = getChromaRed( converted, i, j ) / 255.0;
+		  break;
+	    case XYZ:
+		  (*ch1) = getX(converted, i, j) / 255.0;
+		  (*ch2) = getY( converted, i, j ) / 255.0;
+		  (*ch3) = getZ( converted, i, j ) / 255.0;
+		  break;
+		case HLS:
+		  (*ch1) = getHue(converted, i, j) / 360.0;
+		  (*ch2) = getLightness( converted, i, j );
+		  (*ch3) = getSaturation_LS( converted, i, j );
+		  break;
+		case LAB:
+		  (*ch1) = getLightness_CIE(converted, i, j) / 100.0;
+		  (*ch2) = (getA( converted, i, j ) + 127) / 254.0;
+		  (*ch3) = (getB( converted, i, j ) + 127) / 254.0;
+		  break;
+		case LUV:
+		  (*ch1) = getLightness_CIE(converted, i, j) / 100.0;;
+		  (*ch2) = (getU( converted, i, j ) + 134) / 354.0;
+		  (*ch3) = (getV( converted, i, j ) + 140) / 262.0;
+		  break;				    
+	}
+}
+
+void normalizeInputs( double *ch1, double *ch2, double *ch3 ) {
+	(*ch1) = (*ch1) * (MAX_INPUT_RANGE - MIN_INPUT_RANGE) + MIN_INPUT_RANGE;
+	(*ch2) = (*ch2) * (MAX_INPUT_RANGE - MIN_INPUT_RANGE) + MIN_INPUT_RANGE;
+	(*ch3) = (*ch3) * (MAX_INPUT_RANGE - MIN_INPUT_RANGE) + MIN_INPUT_RANGE;
+}
+
+void reduceLevels( double *ch1, double *ch2, double *ch3, int numberOfLevels ) {
+	if ( numberOfLevels < 256 ) {
+		(*ch1) = floor(((*ch1) * 255 * numberOfLevels) / 256) / (numberOfLevels - 1);
+		(*ch2) = floor(((*ch2) * 255 * numberOfLevels) / 256) / (numberOfLevels - 1);
+		(*ch3) = floor(((*ch3) * 255 * numberOfLevels) / 256) / (numberOfLevels - 1);
+	}
+}
+
+//Returns the total of samples
+long extractFeatures( string fileName, string maskName, FILE* trainFile, FILE* validationFile, int colorspace, int numberOfLevels, int windowSize, double dullDouble, struct fann *dullParameter, ImgResult *dull, int idx ) {
+	IplImage* img = cvLoadImage( fileName.data(), 1 );
+	IplImage* smt = cvCreateImage(cvSize(img->width,img->height), IPL_DEPTH_8U, 3 );
+	cvSmooth( img, smt, CV_GAUSSIAN, windowSize, windowSize );
+	#ifdef SMOOTH_DEBUG
+		cvNamedWindow("imagem", 0);
+		cvNamedWindow("blur", 0);
+		cvShowImage("imagem", img);
+		cvShowImage("blur", smt);
+		cvWaitKey(0);
+		cvDestroyAllWindows();		
+	#endif
+	IplImage* msk = cvLoadImage( maskName.data(), 1 );
+	
+	//The first pass is to count the stuff and nonstuff pixels
+	long noStuffPx    = 0;
+	long noNonStuffPx = 0;
+	for(int i=0;i<smt->height;i++) {
+		for(int j=0;j<smt->width;j++) {
+			int m = getRed(msk,i,j);			
+			if ( m == 0 ) {
+				noNonStuffPx++;
+			} else if ( m == 255 ) {
+				noStuffPx++;
+			}
+		}
+	}
+	
+	long result = 0;
+	if ( noStuffPx != 0 && noNonStuffPx != 0 ) {
+		long stuffStep = 1;
+		long nonStuffStep = 1;
+		if ( noNonStuffPx > noStuffPx ) {
+			nonStuffStep = noNonStuffPx / noStuffPx;
+		} else {
+			stuffStep = noStuffPx / noNonStuffPx;
+		}
+		
+		long stuffToPick    = (noStuffPx<noNonStuffPx)?noStuffPx:noNonStuffPx;
+		//Must be a multiple of the ratio + 1
+		stuffToPick = stuffToPick/(TRAIN_VALIDATION_RATIO + 1) * (TRAIN_VALIDATION_RATIO + 1);
+		#ifdef DEBUG
+			cout << stuffToPick << endl;
+		#endif
+		long nonStuffToPick = stuffToPick;
+		result = stuffToPick + nonStuffToPick;
+		
+		//Performs the conversion:
+		IplImage* converted;
+		if ( colorspace != RGB ) {
+			 #ifdef DEBUG
+    			cout << colorspace << endl;
+    		 #endif
+			 converted = cvCreateImage(cvSize(smt->width,smt->height), IPL_DEPTH_8U, 3 );
+			 cvCvtColor( smt, converted, getConvertion(colorspace) );
+		} else {
+			converted = smt;
+		}
+		
+		long stuffHop    = 0;
+		long nonStuffHop = 0;				
+		for(int i=0;i<smt->height;i++) {
+			for(int j=0;j<smt->width;j++) {
+				int m = getRed(msk,i,j);
+				
+				long *mHop, *mStep, *mToPick;
+				FILE *mFile;
+				if ( m == IS_NON_STUFF ) {
+					mHop = &nonStuffHop;
+					mStep = &nonStuffStep;
+					mToPick = &nonStuffToPick;
+				} else if ( m == IS_STUFF ) {
+					mHop = &stuffHop;
+					mStep = &stuffStep;
+					mToPick = &stuffToPick;
+				} else {
+					continue;
+				}
+				
+				if ( (*mToPick)%(TRAIN_VALIDATION_RATIO+1)==0 ) {
+					mFile = validationFile;
+				} else {
+					mFile = trainFile;
+				}
+				
+				if (((*mHop)++)%(*mStep) == 0 && (--(*mToPick)) >= 0 ) {
+					
+					double ch1, ch2, ch3;
+					getChannels(converted, i, j, colorspace, &ch1, &ch2, &ch3);
+					reduceLevels( &ch1, &ch2, &ch3, numberOfLevels );			
+					//Normalizes to the desired input range
+					normalizeInputs( &ch1, &ch2, &ch3 );
+					
+					#ifdef DEBUG
+						cout << colorspace << " " << ch1 <<  " " << ch2 << " " << ch3 << " " << m << endl;
+						cout << ((m==ISSTUFF)?STUFFRESULT:NONSTUFFRESULT) << " " << ((m==ISSTUFF)?NONSTUFFRESULT:STUFFRESULT) << endl;
+					#endif
+					fprintf(mFile, "%f %f %f\n", ch1, ch2, ch3);
+					fprintf(mFile, "%f %f\n", ((m==IS_STUFF)?STUFF_RESULT:NON_STUFF_RESULT), ((m==IS_STUFF)?NON_STUFF_RESULT:STUFF_RESULT));
+				}
+			}
+		}
+		if ( colorspace != RGB ) {
+			cvReleaseImage( &converted );
+		}
+	}
+	
+	cvReleaseImage( &img );
+	cvReleaseImage( &smt );
+	cvReleaseImage( &msk );
+	return result;
+}
+
+int writeHeaders( char* trainFileName, char* validationFileName, long totalSamples ) {
+	FILE* tempTrainFile = fopen( TEMP_TRAIN_FILE, "r" );
+    FILE* tempValidationFile = fopen( TEMP_VALIDATION_FILE, "r" );
+    
+    FILE* trainFile = fopen( trainFileName, "w" );
+    FILE* validationFile = fopen( validationFileName, "w" );
+    
+    long validationSamples = totalSamples / (TRAIN_VALIDATION_RATIO+1);
+    fprintf( trainFile, "%d 3 2\n", validationSamples * TRAIN_VALIDATION_RATIO );
+    fprintf( validationFile, "%d 3 2\n", validationSamples );
+    
+    for ( long i = 0; i < validationSamples; i++ ) {
+    	float input[3];
+		float desired_output[2];
+    	fscanf(tempValidationFile, "%f", &input[0]);
+    	fscanf(tempValidationFile, "%f", &input[1]);
+    	fscanf(tempValidationFile, "%f", &input[2]);
+    	fscanf(tempValidationFile, "%f", &desired_output[0]);
+    	fscanf(tempValidationFile, "%f", &desired_output[1]);
+    	
+    	fprintf( validationFile, "%f %f %f\n%f %f\n", input[0], input[1], input[2], desired_output[0], desired_output[1]  );
+    }
+    
+    for ( long i = 0; i < validationSamples * TRAIN_VALIDATION_RATIO; i++ ) {
+    	float input[3];
+		float desired_output[2];
+    	fscanf(tempTrainFile, "%f", &input[0]);
+    	fscanf(tempTrainFile, "%f", &input[1]);
+    	fscanf(tempTrainFile, "%f", &input[2]);
+    	fscanf(tempTrainFile, "%f", &desired_output[0]);
+    	fscanf(tempTrainFile, "%f", &desired_output[1]);
+    	
+    	fprintf( trainFile, "%f %f %f\n%f %f\n", input[0], input[1], input[2], desired_output[0], desired_output[1]  );
+    }
+    
+    fclose( tempTrainFile );
+    fclose( tempValidationFile );
+    fclose( trainFile );
+    fclose( validationFile );
+}
+
+bool fileExists(string strFilename) {
+  struct stat stFileInfo;
+  bool blnReturn;
+  int intStat;
+
+  // Attempt to get the file attributes
+  intStat = stat(strFilename.c_str(),&stFileInfo);
+  if(intStat == 0) {
+    // We were able to get the file attributes
+    // so the file obviously exists.
+    blnReturn = true;
+  } else {
+    // We were not able to get the file attributes.
+    // This may mean that we don't have permission to
+    // access the folder which contains this file. If you
+    // need to do that level of checking, lookup the
+    // return values of stat which will give you
+    // more details on why stat failed.
+    blnReturn = false;
+  }
+  
+  return(blnReturn);
+}
+
+int iterateImageSet( char* directory, long *cumulativeLong, iterateOnSetCallBack function, FILE* file1, FILE* file2, int colorspace, int numberOfLevels, int windowSize, double threshold, struct fann *ann, ImgResult *res) {
+//Opens the directory
+	struct dirent   *dit;
+    DIR* dir = opendir( directory );
+    int idx = 0;
+    //Iterates all the way over the files
+    while ((dit = readdir(dir)) != NULL) {    	
+    	//If it is a valid input file
+    	string fileName(dit->d_name);
+    	fileName = directory + fileName;
+    	
+    	bool isSupported = false;
+    	char *ext = NULL;
+    	for ( int i = 0; i < IMG_EXT && !isSupported; i++ ) { 
+ 			isSupported = (fileName.find(supportedImgExtensions[i]) == ( fileName.size() - strlen(supportedImgExtensions[i]) ));
+ 			ext = supportedImgExtensions[i];
+    	}
+    	
+    	if ( isSupported ) {
+    		//Finds the correspondent mask
+    		string pureName = fileName.substr( 0, fileName.size() - strlen(ext));
+    		string maskName;
+    		bool hasMask = false;
+    		for ( int i = 0; i < MSK_EXT && !hasMask; i++ ) { 
+    			 maskName = pureName + supportedMskExtensions[i];
+    			 hasMask = fileExists( maskName );
+    		}
+    		
+    		if ( hasMask ) {
+    			#ifdef DEBUG
+    			  cout << "Valid File: " << fileName << endl;
+    			#endif
+    			(*cumulativeLong) += function( fileName, maskName, file1, file2, colorspace, numberOfLevels, windowSize, threshold, ann, res, idx );
+    			idx++;
+    		} else {
+    			cout << "No mask found for file " << fileName << endl;
+    		}    		
+    	} else {
+    		#ifdef DEBUG
+    			cout << "Invalid File: " << fileName << endl;
+    		#endif
+    	}
+    } 
+	return 0;    
+}
+
+int createTrainingFiles( char* trainingDir, char* trainFileName, char* validationFileName, int colorspace, int numberOfLevels, int windowSize ) {
+	
+	FILE* tempTrainFile = fopen( TEMP_TRAIN_FILE, "w" );
+    FILE* tempValidationFile = fopen( TEMP_VALIDATION_FILE, "w" );
+	long totalSamples = 0;
+	
+	iterateImageSet( trainingDir, &totalSamples, &extractFeatures, tempTrainFile, tempValidationFile, colorspace, numberOfLevels, windowSize, 0.0, NULL, NULL );
+        
+    fclose( tempTrainFile );
+    fclose( tempValidationFile );
+    if ( totalSamples > 0 ) {
+    	writeHeaders( trainFileName, validationFileName, totalSamples );
+    	remove(TEMP_TRAIN_FILE);
+    	remove(TEMP_VALIDATION_FILE);
+    }    
+	return 0;
+}
+
+char* getColorSpace( int colorspace ) {
+	switch (colorspace) {
+		case HSV: return "HSV"; break;
+		case YCBCR: return "YCbCr"; break;
+		case XYZ: return "XYZ"; break;
+		case HLS: return "HLS"; break;
+		case LAB: return "L*a*b*"; break;
+		case LUV: return "L*u*v*"; break;
+		default : return "RGB";
+	}
+}
+
+struct fann* trainAnn( int h, fann_train_data *trainData, fann_train_data *validationData ) {
+	struct fann *ann = fann_create_standard( 3, 3, h, 2 );
+	fann_set_activation_function_hidden(ann, FANN_SIGMOID_SYMMETRIC	);
+    fann_set_activation_function_output(ann, FANN_SIGMOID_SYMMETRIC );
+	int epoch = 0;
+	double MSE = 0;
+	double bestMSE = 999999;
+	while ( epoch < maxEpochs ) {
+	    fann_train_epoch(ann, trainData);		
+		epoch++;
+		fann_reset_MSE( ann );
+		fann_test_data(ann, validationData);
+		MSE = fann_get_MSE( ann );
+		if ( MSE < bestMSE ) {
+			bestMSE = MSE;
+			fann_save(ann, MINIMUM_MSE_NET_FILE_NAME);
+		}
+		if ( epoch%epochsBetweenReports == 0 || epoch==1 || epoch == maxEpochs ) {
+			cout << "Epoch: "  << epoch << "\tMSE: " << MSE << "\tBest MSE: " << bestMSE << endl;
+		}
+	}
+	fann_destroy( ann );
+	ann = fann_create_from_file( MINIMUM_MSE_NET_FILE_NAME );
+	remove(MINIMUM_MSE_NET_FILE_NAME);
+	return ann;
+}
+
+int saveNN (struct fann *ann, int colorspace, int numberOfLevels, int windowSize, int hiddenNeurons ) {
+	string fileName = ANN_FILE_PREFIX;
+	fileName = fileName + ANN_FILE_SEP + getColorSpace( colorspace );
+	char buff[10];
+	sprintf(buff,"%d",numberOfLevels);
+	fileName = fileName + ANN_FILE_SEP + buff;
+	sprintf(buff,"%d",windowSize);
+	fileName = fileName + ANN_FILE_SEP + buff;
+	sprintf(buff,"%d",hiddenNeurons);
+	fileName = fileName + ANN_FILE_SEP + buff;
+	fann_save(ann, fileName.data());
+}
+
+void initResult( ImgResult *res ) {
+	res->fn = 0;
+	res->fp = 0;
+	res->nonStuff = 0;
+	res->stuff = 0;
+	res->tn = 0;
+	res->tp = 0;
+	res->dunno = 0;
+}
+
+double abs( double x ) {
+	return (x>=0)?x:-x;
+}
+
+long applyNetwork( string fileName, string maskName, FILE* dullParameter1, FILE* dullParameter2, int colorspace, int numberOfLevels, int windowSize, double threshold, struct fann *ann, ImgResult *res, int idx ) {
+	IplImage* img = cvLoadImage( fileName.data(), 1 );
+	IplImage* smt = cvCreateImage(cvSize(img->width,img->height), IPL_DEPTH_8U, 3 );
+	cvSmooth( img, smt, CV_GAUSSIAN, windowSize, windowSize );
+	IplImage* msk = cvLoadImage( maskName.data(), 1 );
+		
+	//Performs the conversion:
+	IplImage* converted;
+	if ( colorspace != RGB ) {
+		#ifdef DEBUG
+    		cout << colorspace << endl;
+    	#endif
+		converted = cvCreateImage(cvSize(smt->width,smt->height), IPL_DEPTH_8U, 3);
+		cvCvtColor( smt, converted, getConvertion(colorspace) );
+	} else {
+		converted = smt;
+	}
+	initResult( &(res[idx]) );
+	fann_type *calc_out;
+    fann_type input[3];
+	for(int i=0;i<smt->height;i++) {
+		for(int j=0;j<smt->width;j++) {
+			int m = getRed(msk,i,j);
+			//cout << m  << endl;
+			if ( m == IS_STUFF || m == IS_NON_STUFF ) {
+					
+				double ch1, ch2, ch3;
+				getChannels(converted, i, j, colorspace, &ch1, &ch2, &ch3);
+				reduceLevels( &ch1, &ch2, &ch3, numberOfLevels );			
+				//Normalizes to the desired input range
+				normalizeInputs( &ch1, &ch2, &ch3 );
+			
+				input[0] = ch1;
+    			input[1] = ch2; 			
+    			input[2] = ch3;
+    			calc_out = fann_run(ann, input);
+    			#ifdef DEBUG
+    				cout << m << endl;
+    				cout << "Results: " << calc_out[0] << "\t" << calc_out[1] << endl;
+    			#endif
+    			//Updates stuff and nonstuff
+    			if ( m == IS_STUFF ) {
+    				res[idx].stuff++;
+    			} else {
+    				res[idx].nonStuff++;
+    			}
+    			//First tests if the pixel is classifiable
+    			double diff = calc_out[0] - calc_out[1];
+    			if (( calc_out[0] >= 0 && calc_out[1] >= 0 ) || ( calc_out[0] < 0 && calc_out[1] < 0 ) || (abs(diff) <= threshold ) ) {
+    				res[idx].dunno++;
+    			} else if ( m == IS_STUFF ) {
+    				if ( calc_out[0] > calc_out[1] ) {
+    					res[idx].tp++;
+    				} else {
+    					res[idx].fn++;
+    				}
+    			} else {
+    				if ( calc_out[0] < calc_out[1] ) {
+    					res[idx].tn++;
+    				} else {
+    					res[idx].fp++;
+    				}
+    			}
+			}			
+		}
+	}
+	
+	if ( colorspace != RGB ) {
+		cvReleaseImage( &converted );
+	}
+	
+	cvReleaseImage( &smt );
+	cvReleaseImage( &img );
+	cvReleaseImage( &msk );
+	return 1;
+}
+
+string getMetricsFileName( int colorspace, int numberOfLevels, int windowSize, int hiddenNeurons ) { 
+    string fileName = METRIX_FILE_PREFIX;
+	fileName = fileName + METRIX_FILE_SEP + getColorSpace( colorspace );
+	char buff[10];
+	sprintf(buff,"%d",numberOfLevels);
+	fileName = fileName + METRIX_FILE_SEP + buff;
+	sprintf(buff,"%d",windowSize);
+	fileName = fileName + METRIX_FILE_SEP + buff;
+	sprintf(buff,"%d",hiddenNeurons);
+	fileName = fileName + METRIX_FILE_SEP + buff;
+	return fileName;
+}
+
+//Returns average F-measure
+double testNN( struct fann *ann, int colorspace, int numberOfLevels, int windowSize, int hiddenNeurons, double threshold, char* testDir, bool saveInFile ) {
+	long totalImages = 0;
+	
+	ImgResult results[MAX_TEST_IMAGES];	
+	iterateImageSet( testDir, &totalImages, &applyNetwork, NULL, NULL, colorspace, numberOfLevels, windowSize, threshold, ann, results );
+    string fileName = getMetricsFileName( colorspace, numberOfLevels, windowSize, hiddenNeurons );
+    FILE* file;
+    if ( saveInFile ) {
+    	file = fopen( fileName.data(), "w" );
+    }
+    long sumTP = 0;
+    long sumFP = 0;
+    long sumStuff = 0;  
+    long sumNonStuff = 0;
+    long sumDunno = 0;
+    for ( int i = 0; i < totalImages; i++ ) {
+    	//Precision Calculation
+    	double precision;
+    	if ( results[i].tp + results[i].fp != 0 ) {
+    		precision = ((double)results[i].tp) / ((double)( results[i].tp + results[i].fp ));
+    	} else {
+    		precision = 0;
+    	}
+    	
+    	//Recall Calculation
+		double recall;
+		if ( results[i].stuff != 0 ) {
+			recall = ((double)results[i].tp) / ((double) results[i].stuff);
+		} else {
+			recall = 0;
+		}
+		
+		//Coverage Calculation
+		double coverage = 1 - ((double)results[i].dunno) / ((double) results[i].stuff + (double) results[i].nonStuff);
+		
+		double fMeasure = 0;
+		if ( precision * recall + precision * coverage + recall * coverage != 0 ) {
+			fMeasure = 3 * precision * recall * coverage / ( precision * recall + precision * coverage + recall * coverage);
+		} else {
+			fMeasure = 0;
+		}
+		#ifdef METRIX_DEBUG
+			cout << results[i].stuff << "\t" << results[i].nonStuff << "\t" << results[i].tp << "\t" << results[i].fn  << "\t";
+			cout << results[i].tn  << "\t" << results[i].fp << "\t" << results[i].dunno << "\t" << precision << "\t" << recall << "\t" << coverage << "\t"; 
+			cout << fMeasure << endl;
+		#endif
+		sumTP += results[i].tp;
+		sumFP += results[i].fp;
+		sumStuff += results[i].stuff;
+		sumNonStuff += results[i].nonStuff;
+		sumDunno += results[i].dunno;
+    }
+    double overallPrecision = ((double)sumTP) / ((double)( sumTP + sumFP ));
+	double overallRecall = ((double)sumTP) / ((double) sumStuff);
+	double overallCoverage = 1 - ((double)sumDunno) / ((double) sumStuff + (double) sumNonStuff);
+    double overallFMeasure = 0;
+    if ( overallPrecision * overallRecall + overallPrecision * overallCoverage + overallRecall * overallCoverage != 0 ) {
+		overallFMeasure = 3 * overallPrecision * overallRecall * overallCoverage / ( overallPrecision * overallRecall + overallPrecision * overallCoverage + overallRecall * overallCoverage);
+	} else {
+		overallFMeasure = 0;
+	}
+    
+    if ( saveInFile ) {
+    	fprintf(file, "%f\n", overallFMeasure );
+    	fprintf(file, "Chosen threshold: %f\n", threshold );
+    	fprintf(file, "Sum TP: %d\t Sum FP: %d\t Sum Stuff: %d\t Sum Non Stuff: %d\t Sum Dunno: %d\n", sumTP, sumFP, sumStuff, sumNonStuff, sumDunno );
+   		fprintf(file, "Precision: %f\t Recall: %f\t Coverage: %f\n", overallPrecision, overallRecall, overallCoverage );    	
+    	fclose( file );
+    }
+    printf( "Sum TP: %d\t Sum FP: %d\t Sum Stuff: %d\t Sum Non Stuff: %d\t Sum Dunno: %d\n", sumTP, sumFP, sumStuff, sumNonStuff, sumDunno );
+    printf( "Precision: %f\t Recall: %f\t Coverage: %f\n", overallPrecision, overallRecall, overallCoverage );
+	return overallFMeasure;
+}
+
+int saveConfig (int colorspace, int numberOfLevels, int windowSize, double threshold ) {
+	string fileName = CONFIG_FILE_NAME;
+	FILE* cfg = fopen( CONFIG_FILE_NAME, "w" );
+	fprintf(cfg, "%d\n%d\n%d\n%f\n", colorspace, numberOfLevels, windowSize, threshold );
+	fclose( cfg );
+	return 0;
+}
+
+int saveFMeasure( double bestFMeasure, char* fileName ) {
+	FILE* fmf = fopen( fileName, "w" );
+	fprintf(fmf, "%f\n", bestFMeasure );
+	fclose( fmf );
+	return 0;
+}
+
+int saveInteger( int integer, char* fileName ) {
+	FILE* fmf = fopen( fileName, "w" );
+	fprintf(fmf, "%d\n", integer );
+	fclose( fmf );
+	return 0;
+}
+
+double getFMeasure(char* fileName) {
+	string fn = fileName;
+	if ( fileExists( fn ) ) {
+		FILE* fmf = fopen( fn.data(), "r" );
+		float bestFMeasure;
+		fscanf(fmf, "%f\n", &bestFMeasure );
+		fclose( fmf );
+		return bestFMeasure;
+	} else {
+		return -1;
+	}
+}
+
+int readInteger(char* fileName) {
+	string fn = fileName;
+	if ( fileExists( fn ) ) {
+		FILE* fmf = fopen( fn.data(), "r" );
+		int integer;
+		fscanf(fmf, "%d\n", &integer );
+		fclose( fmf );
+		return integer;
+	} else {
+		return -1;
+	}
+}
+
+int heavyObtainNetwork( char* trainingDir, char* testDir, int colorspaces[] ) {
+	//Initialization
+	double       bestFMeasure = -1;
+	int          bestColorSpace = -1;
+	int          bestNumberOfLevels = -1;
+	int          bestWindowSize = -1;
+	double       bestThreshold = -1;
+	//Varying parameter colorspace
+	for ( int cs = 0; cs < NO_COLORSPACES; cs++ ) {
+		for ( int levels = 256; levels >= minimumNumberLevels; levels = levels / 2 ) {
+			for ( int window = 1; window <= maximumWindowSize; window = window + 2 ) {
+				//Creates two files...
+				cout << "Extracting Features for Color Space " << getColorSpace( colorspaces[cs] ) << " with " << levels << " levels of quantization and window size " << window << endl;
+				createTrainingFiles( trainingDir, TRAIN_FILE, VALIDATION_FILE, colorspaces[cs], levels, window );
+				
+				//Create DataStructures
+				fann_train_data *trainData = fann_read_train_from_file(TRAIN_FILE);
+			    fann_train_data *validationData = fann_read_train_from_file(VALIDATION_FILE);
+				
+				//Varying number of hidden neurons
+				for ( int h = minimumHidden; h <= maximumHidden; h++ ) {
+					double localThreshold = -1; //For each mtr file, there will be a threshold, which is not global
+					double localFMeasure  = -1; //Same for F-Measure
+					
+					//If the metric file does not exist
+					if ( !fileExists(getMetricsFileName(colorspaces[cs], levels, window, h)) ) {
+						
+						//Training Iterations
+						for ( int i = 1; i <= trainingIterations; i++ ) {
+							cout << "Training Neural Network for "<< getColorSpace( colorspaces[cs] ) << " with " << levels << " levels of quantization and window size " << window << ". Hidden Neurons: " << h << ". Iteration " << i << endl;
+							struct fann *ann = trainAnn( h, trainData, validationData );
+							
+							//Learning Threshold
+							for ( double threshold = 0; threshold <= STUFF_RESULT - NON_STUFF_RESULT; threshold = threshold + thresholdStep ) {
+								cout << "Testing Neural Network for "<< getColorSpace( colorspaces[cs] ) << " with " << levels << " levels of quantization and window size " << window << ". Hidden Neurons: " << h << ". Iteration " << i << ". Threshold: " << threshold << endl;
+								
+								//Testes NN with current Threshold
+								double thisFMeasure = testNN( ann, colorspaces[cs], levels, window, h, threshold, testDir, false );
+							
+								//Keeping track of best nn/th combination
+								if ( thisFMeasure > bestFMeasure ) {
+									cout << "This is the temporary best nn/threshold: f-measure = " << thisFMeasure << endl;
+									fann_save( ann, NETWORK_FILE_NAME );							
+									bestFMeasure = thisFMeasure;
+									bestColorSpace = colorspaces[cs];
+									bestNumberOfLevels = levels;
+									bestWindowSize = window;
+									bestThreshold = threshold;
+									saveConfig( bestColorSpace, bestNumberOfLevels, bestWindowSize, bestThreshold );
+								} else {
+									cout << "f-measure = " << thisFMeasure << "\tbest one: " << bestFMeasure << endl;
+								}
+								
+								if ( thisFMeasure > localFMeasure ) {
+									localFMeasure = thisFMeasure;
+									localThreshold = threshold;
+									fann_save( ann, LOCAL_ANN_FILE_NAME );
+								}
+							}
+						}
+						//Saving NN...
+						struct fann *localann = fann_create_from_file( LOCAL_ANN_FILE_NAME ); 
+						saveNN( localann, colorspaces[cs], levels, window, h );
+						//Saving Metrics with local threshold
+						testNN( localann, colorspaces[cs], levels, window, h, localThreshold, testDir, true );
+						fann_destroy( localann );
+					}
+				}
+				fann_destroy_train( trainData );
+				fann_destroy_train( validationData );
+			}
+		}
+	}
+	
+	return 0;
+}
+
+void keepTrack( double thisFMeasure, double *bestFMeasure, int *bestColorSpace, int *bestNumberOfLevels, int* bestWindowSize, int *bestHiddenNeurons, double *bestThershold, struct fann *ann, ) {
+	//Keeping track of best nn/th combination
+	if ( thisFMeasure > (*bestFMeasure) ) {
+		cout << "This is the temporary best nn/threshold: f-measure = " << thisFMeasure << endl;
+		fann_save( ann, NETWORK_FILE_NAME );							
+		(*bestFMeasure) = thisFMeasure;
+		bestColorSpace = colorspaces[cs];
+		bestNumberOfLevels = FIXED_LEVELS;
+		bestWindowSize = FIXED_WINDOW;
+		bestHiddenNeurons = FIXED_HIDDEN;
+		bestThreshold = threshold;
+		saveConfig( bestColorSpace, bestNumberOfLevels, bestWindowSize, bestThreshold );
+	} else {
+		cout << "f-measure = " << thisFMeasure << "\tbest one: " << bestFMeasure << endl;
+	}
+}
+
+int lightObtainNetwork( char* trainingDir, char* testDir, int colorspaces[] ) {
+	//Initialization
+	double       bestFMeasure = -1;
+	int          bestColorSpace = -1;
+	int          bestNumberOfLevels = -1;
+	int          bestWindowSize = -1;
+	int          bestHiddenNeurons = -1;
+	double       bestThreshold = -1;
+	
+	#ifdef BEST_DEBUG
+	   cout << "Best fmeasure: " << bestFMeasure << endl;
+	   cout << "Best color: " << bestColorSpace << endl;
+	   cout << "Best levels: " << bestNumberOfLevels << endl;
+	   cout << "Best window: " << bestWindowSize << endl;
+	   cout << "Best hidden: " << bestHiddenNeurons << endl;
+	#endif
+	
+	//Exploring colorspace...
+	cout << "Determining best COLORSPACE" << endl;
+	//Other Parameters are fixed...
+	for ( int cs = 0; cs < NO_COLORSPACES; cs++ ) {		
+		double localThreshold = -50; //For each mtr file, there will be a threshold, which is not global
+		double localFMeasure  = -1; //Same for F-Measure
+		double thisFMeasure = -1;
+		if ( !fileExists(getMetricsFileName(colorspaces[cs], FIXED_LEVELS, FIXED_WINDOW, FIXED_HIDDEN)) ) {
+			//Creates two files...
+			cout << "Extracting Features for Color Space " << getColorSpace( colorspaces[cs] ) << " with " << FIXED_LEVELS << " levels of quantization and window size "<< FIXED_WINDOW << endl;
+			createTrainingFiles( trainingDir, TRAIN_FILE, VALIDATION_FILE, colorspaces[cs], FIXED_LEVELS, FIXED_WINDOW );
+					
+			//Create DataStructures
+			fann_train_data *trainData = fann_read_train_from_file(TRAIN_FILE);
+			fann_train_data *validationData = fann_read_train_from_file(VALIDATION_FILE);
+			
+			cout << "Training Neural Network for "<< getColorSpace( colorspaces[cs] ) << " with " << FIXED_LEVELS << " levels of quantization and window size " << FIXED_WINDOW << ". Hidden Neurons: " << FIXED_HIDDEN << ". " << endl;
+			struct fann *ann = trainAnn( FIXED_HIDDEN, trainData, validationData );
+			
+			//Learning Threshold
+			for ( double threshold = 0; threshold <= STUFF_RESULT - NON_STUFF_RESULT; threshold = threshold + thresholdStep ) {
+				cout << "Testing Neural Network for "<< getColorSpace( colorspaces[cs] ) << " with " << FIXED_LEVELS << " levels of quantization and window size " << FIXED_WINDOW << ". Hidden Neurons: " << FIXED_HIDDEN << ". Threshold: " << threshold << endl;
+						
+				//Testes NN with current Threshold
+				thisFMeasure = testNN( ann, colorspaces[cs], FIXED_LEVELS, FIXED_WINDOW, FIXED_HIDDEN, threshold, testDir, false );
+							
+				keepTrack();
+				
+				if ( thisFMeasure > localFMeasure ) {
+					localFMeasure = thisFMeasure;
+					localThreshold = threshold;
+					fann_save( ann, LOCAL_ANN_FILE_NAME );
+				}
+			}			
+			fann_destroy_train( trainData );
+			fann_destroy_train( validationData );
+		} else {
+			
+		}
+		if ( fileExists( LOCAL_ANN_FILE_NAME ) ) {
+			//Saving NN...
+			struct fann *localann = fann_create_from_file( LOCAL_ANN_FILE_NAME ); 
+			saveNN( localann, colorspaces[cs], FIXED_LEVELS, FIXED_WINDOW, FIXED_HIDDEN );
+			//Saving Metrics with local threshold
+			testNN( localann, colorspaces[cs], FIXED_LEVELS, FIXED_WINDOW, FIXED_HIDDEN, localThreshold, testDir, true );
+			fann_destroy( localann );
+			remove( LOCAL_ANN_FILE_NAME );
+		}
+	}
+	
+	//Exploring levels...
+	cout << "Determining best number of QUANTIZATION LEVELS" << endl;
+	//Other Parameters are fixed...
+	for ( int levels = 256; levels >= minimumNumberLevels; levels = levels / 2 ) {
+		double localThreshold = -1; //For each mtr file, there will be a threshold, which is not global
+		double localFMeasure  = -1; //Same for F-Measure
+		
+		if ( !fileExists(getMetricsFileName(bestColorSpace, levels, FIXED_WINDOW, FIXED_HIDDEN)) ) {
+			//Creates two files...
+			cout << "Extracting Features for Color Space " << getColorSpace( bestColorSpace ) << " with " << levels << " levels of quantization and window size "<< FIXED_WINDOW << endl;
+			createTrainingFiles( trainingDir, TRAIN_FILE, VALIDATION_FILE, bestColorSpace, levels, FIXED_WINDOW );
+					
+			//Create DataStructures
+			fann_train_data *trainData = fann_read_train_from_file(TRAIN_FILE);
+			fann_train_data *validationData = fann_read_train_from_file(VALIDATION_FILE);
+			
+			cout << "Training Neural Network for "<< getColorSpace( bestColorSpace ) << " with " << levels << " levels of quantization and window size " << FIXED_WINDOW << ". Hidden Neurons: " << FIXED_HIDDEN << ". " << endl;
+			struct fann *ann = trainAnn( FIXED_HIDDEN, trainData, validationData );
+			
+			//Learning Threshold
+			for ( double threshold = 0; threshold <= STUFF_RESULT - NON_STUFF_RESULT; threshold = threshold + thresholdStep ) {
+				cout << "Testing Neural Network for "<< getColorSpace( bestColorSpace ) << " with " << levels << " levels of quantization and window size " << FIXED_WINDOW << ". Hidden Neurons: " << FIXED_HIDDEN << ". Threshold: " << threshold << endl;
+						
+				//Testes NN with current Threshold
+				double thisFMeasure = testNN( ann, bestColorSpace, levels, FIXED_WINDOW, FIXED_HIDDEN, threshold, testDir, false );
+							
+				//Keeping track of best nn/th combination
+				if ( thisFMeasure > bestFMeasure ) {
+					cout << "This is the temporary best nn/threshold: f-measure = " << thisFMeasure << endl;
+					fann_save( ann, NETWORK_FILE_NAME );							
+					bestFMeasure = thisFMeasure;
+					saveFMeasure( bestFMeasure, BEST_FM_FILE_NAME );
+					bestNumberOfLevels = levels;
+					saveInteger( bestNumberOfLevels, BEST_LV_FILE_NAME);
+					bestWindowSize = FIXED_WINDOW;
+					bestHiddenNeurons = FIXED_HIDDEN;
+					bestThreshold = threshold;
+					saveConfig( bestColorSpace, bestNumberOfLevels, bestWindowSize, bestThreshold );
+				} else {
+					cout << "f-measure = " << thisFMeasure << "\tbest one: " << bestFMeasure << endl;
+				}
+				if ( thisFMeasure > localFMeasure ) {
+					localFMeasure = thisFMeasure;
+					localThreshold = threshold;
+					fann_save( ann, LOCAL_ANN_FILE_NAME );
+				}
+			}
+			fann_destroy_train( trainData );
+			fann_destroy_train( validationData );			
+		}
+		if ( fileExists( LOCAL_ANN_FILE_NAME ) ) {
+			//Saving NN...
+			struct fann *localann = fann_create_from_file( LOCAL_ANN_FILE_NAME ); 
+			saveNN( localann, bestColorSpace, levels, FIXED_WINDOW, FIXED_HIDDEN );
+			//Saving Metrics with local threshold
+			testNN( localann, bestColorSpace, levels, FIXED_WINDOW, FIXED_HIDDEN, localThreshold, testDir, true );
+			fann_destroy( localann );
+			remove( LOCAL_ANN_FILE_NAME );
+		}		
+	}
+	
+	bestNumberOfLevels = readInteger( BEST_LV_FILE_NAME );
+	
+	//Exploring levels...
+	cout << "Determining best WINDOW SIZE" << endl;
+	//Other Parameters are fixed...
+	for ( int window = 1; window <= maximumWindowSize; window = window + 2 ) {		
+		double localThreshold = -1; //For each mtr file, there will be a threshold, which is not global
+		double localFMeasure  = -1; //Same for F-Measure
+		if ( !fileExists(getMetricsFileName(bestColorSpace, bestNumberOfLevels, window, FIXED_HIDDEN)) ) {
+			//Creates two files...
+			cout << "Extracting Features for Color Space " << getColorSpace( bestColorSpace ) << " with " << bestNumberOfLevels << " levels of quantization and window size "<< window << endl;
+			createTrainingFiles( trainingDir, TRAIN_FILE, VALIDATION_FILE, bestColorSpace, bestNumberOfLevels, window );
+					
+			//Create DataStructures
+			fann_train_data *trainData = fann_read_train_from_file(TRAIN_FILE);
+			fann_train_data *validationData = fann_read_train_from_file(VALIDATION_FILE);
+			
+			cout << "Training Neural Network for "<< getColorSpace( bestColorSpace ) << " with " << bestNumberOfLevels << " levels of quantization and window size " << window << ". Hidden Neurons: " << FIXED_HIDDEN << ". " << endl;
+			struct fann *ann = trainAnn( FIXED_HIDDEN, trainData, validationData );
+			
+			//Learning Threshold
+			for ( double threshold = 0; threshold <= STUFF_RESULT - NON_STUFF_RESULT; threshold = threshold + thresholdStep ) {
+				cout << "Testing Neural Network for "<< getColorSpace( bestColorSpace ) << " with " << bestNumberOfLevels << " levels of quantization and window size " << window << ". Hidden Neurons: " << FIXED_HIDDEN << ". Threshold: " << threshold << endl;
+						
+				//Testes NN with current Threshold
+				double thisFMeasure = testNN( ann, bestColorSpace, bestNumberOfLevels, window, FIXED_HIDDEN, threshold, testDir, false );
+							
+				//Keeping track of best nn/th combination
+				if ( thisFMeasure > bestFMeasure ) {
+					cout << "This is the temporary best nn/threshold: f-measure = " << thisFMeasure << endl;
+					fann_save( ann, NETWORK_FILE_NAME );							
+					bestFMeasure = thisFMeasure;
+					saveFMeasure( bestFMeasure, BEST_FM_FILE_NAME );
+					bestWindowSize = window;
+					saveInteger( bestWindowSize, BEST_WD_FILE_NAME);
+					bestHiddenNeurons = FIXED_HIDDEN;
+					bestThreshold = threshold;
+					saveConfig( bestColorSpace, bestNumberOfLevels, bestWindowSize, bestThreshold );
+				} else {
+					cout << "f-measure = " << thisFMeasure << "\tbest one: " << bestFMeasure << endl;
+				}
+				if ( thisFMeasure > localFMeasure ) {
+					localFMeasure = thisFMeasure;
+					localThreshold = threshold;
+					fann_save( ann, LOCAL_ANN_FILE_NAME );
+				}
+			}			
+			fann_destroy_train( trainData );
+			fann_destroy_train( validationData );
+		}
+		if ( fileExists( LOCAL_ANN_FILE_NAME ) ) {
+			//Saving NN...
+			struct fann *localann = fann_create_from_file( LOCAL_ANN_FILE_NAME ); 
+			saveNN( localann, bestColorSpace, bestNumberOfLevels, window, FIXED_HIDDEN );
+			//Saving Metrics with local threshold
+			testNN( localann, bestColorSpace, bestNumberOfLevels, window, FIXED_HIDDEN, localThreshold, testDir, true );
+			fann_destroy( localann );
+			remove( LOCAL_ANN_FILE_NAME );
+		}
+	}
+	
+	bestWindowSize = readInteger( BEST_WD_FILE_NAME);
+	
+	//Creates two files...
+	cout << "Extracting Features for Color Space " << getColorSpace( bestColorSpace ) << " with " << bestNumberOfLevels << " levels of quantization and window size "<< bestWindowSize << endl;
+	createTrainingFiles( trainingDir, TRAIN_FILE, VALIDATION_FILE, bestColorSpace, bestNumberOfLevels, bestWindowSize );
+				
+	//Create DataStructures
+	fann_train_data *trainData = fann_read_train_from_file(TRAIN_FILE);
+	fann_train_data *validationData = fann_read_train_from_file(VALIDATION_FILE);
+	
+	//Exploring levels...
+	cout << "Determining best number of HIDDEN NEURONS" << endl;
+	//Other Parameters are fixed...
+	for ( int h = minimumHidden; h <= maximumHidden; h++ ) {		
+		double localThreshold = -1; //For each mtr file, there will be a threshold, which is not global
+		double localFMeasure  = -1; //Same for F-Measure
+		if ( !fileExists(getMetricsFileName(bestColorSpace, bestNumberOfLevels, bestWindowSize, h)) ) {
+			cout << "Training Neural Network for "<< getColorSpace( bestColorSpace ) << " with " << bestNumberOfLevels << " levels of quantization and window size " << bestWindowSize << ". Hidden Neurons: " << h << ". " << endl;
+			struct fann *ann = trainAnn( FIXED_HIDDEN, trainData, validationData );
+			
+			//Learning Threshold
+			for ( double threshold = 0; threshold <= STUFF_RESULT - NON_STUFF_RESULT; threshold = threshold + thresholdStep ) {
+				cout << "Testing Neural Network for "<< getColorSpace( bestColorSpace ) << " with " << bestNumberOfLevels << " levels of quantization and window size " << bestWindowSize << ". Hidden Neurons: " << h << ". Threshold: " << threshold << endl;
+						
+				//Testes NN with current Threshold
+				double thisFMeasure = testNN( ann, bestColorSpace, bestNumberOfLevels, bestWindowSize, h, threshold, testDir, false );
+							
+				//Keeping track of best nn/th combination
+				if ( thisFMeasure > bestFMeasure ) {
+					cout << "This is the temporary best nn/threshold: f-measure = " << thisFMeasure << endl;
+					fann_save( ann, NETWORK_FILE_NAME );							
+					bestFMeasure = thisFMeasure;
+					bestHiddenNeurons = h;
+					saveInteger( bestHiddenNeurons, BEST_HN_FILE_NAME );
+					saveFMeasure( bestFMeasure, BEST_FM_FILE_NAME );
+					bestThreshold = threshold;
+					saveConfig( bestColorSpace, bestNumberOfLevels, bestWindowSize, bestThreshold );
+				} else {
+					cout << "f-measure = " << thisFMeasure << "\tbest one: " << bestFMeasure << endl;
+				}
+				if ( thisFMeasure > localFMeasure ) {
+					localFMeasure = thisFMeasure;
+					localThreshold = threshold;
+					fann_save( ann, LOCAL_ANN_FILE_NAME );
+				}
+			}			
+		}
+		if ( fileExists( LOCAL_ANN_FILE_NAME ) ) {
+			//Saving NN...
+			struct fann *localann = fann_create_from_file( LOCAL_ANN_FILE_NAME ); 
+			saveNN( localann, bestColorSpace, bestNumberOfLevels, bestWindowSize, h );
+			//Saving Metrics with local threshold
+			testNN( localann, bestColorSpace, bestNumberOfLevels, bestWindowSize, h, localThreshold, testDir, true );
+			fann_destroy( localann );
+			remove( LOCAL_ANN_FILE_NAME );
+		}
+	}	
+	
+	bestHiddenNeurons = readInteger( BEST_HN_FILE_NAME );
+	
+	//Makes iteration to get the best NN
+	for ( int i = 1; i <= trainingIterations; i++ ) {
+		cout << "Training Neural Network for "<< bestColorSpace << " with " << bestNumberOfLevels << " levels of quantization and window size " << bestWindowSize << ". Hidden Neurons: " << bestHiddenNeurons << ". Iteration " << i << endl;
+		struct fann *ann = trainAnn( bestHiddenNeurons, trainData, validationData );
+	
+		//Learning Threshold
+		for ( double threshold = 0; threshold <= STUFF_RESULT - NON_STUFF_RESULT; threshold = threshold + thresholdStep ) {
+			cout << "Testing Neural Network for "<< bestColorSpace << " with " << bestNumberOfLevels << " levels of quantization and window size " << bestWindowSize << ". Hidden Neurons: " << bestHiddenNeurons << ". Iteration " << i << ". Threshold: " << threshold << endl;
+			
+			//Testes NN with current Threshold
+			double thisFMeasure = testNN( ann, bestColorSpace, bestNumberOfLevels, bestWindowSize, bestHiddenNeurons, threshold, testDir, false );
+		
+			//Keeping track of best nn/th combination
+			if ( thisFMeasure > bestFMeasure ) {
+				cout << "This is the temporary best nn/threshold: f-measure = " << thisFMeasure << endl;
+				fann_save( ann, NETWORK_FILE_NAME );							
+				bestFMeasure = thisFMeasure;
+				saveFMeasure( bestFMeasure, BEST_FM_FILE_NAME );
+				bestThreshold = threshold;
+				saveConfig( bestColorSpace, bestNumberOfLevels, bestWindowSize, bestThreshold );
+			} else {
+				cout << "f-measure = " << thisFMeasure << "\tbest one: " << bestFMeasure << endl;
+			}
+		}
+	}
+
+
+	fann_destroy_train( trainData );
+	fann_destroy_train( validationData );
+	return 0;
+}
+
+int bmain(int argc, const char* argv[]) {
+	
+	//Option management
+	processOptions(argc, argv);
+	
+	//Initializes colorspaces
+	int colorspaces[NO_COLORSPACES];
+	for ( int i = 0; i < NO_COLORSPACES; i++ ) {
+		colorspaces[i] = i;			
+	}
+	
+    //Initializes Global Structures
+	supportedImgExtensions[0] = ".jpg";
+	supportedImgExtensions[1] = ".JPG";
+	supportedImgExtensions[2] = ".jpeg";
+	supportedImgExtensions[3] = ".JPEG";
+	supportedImgExtensions[4] = ".bmp";
+	supportedImgExtensions[5] = ".BMP";
+	
+	supportedMskExtensions[0] = ".pgm";
+	supportedMskExtensions[1] = ".PGM";
+	
+	//Obtain the best network
+	if ( lightFlag ) { 
+		lightObtainNetwork( trainingDirectory, testDirectory, colorspaces );
+	} else {
+		heavyObtainNetwork( trainingDirectory, testDirectory, colorspaces );
+	}
+		
+	return 0;
+}
