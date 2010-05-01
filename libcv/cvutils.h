@@ -10,7 +10,7 @@
 #define setBlue(img,i,j,b) (((uchar *)(img->imageData + i*img->widthStep))[j*img->nChannels + 0]) = b
  
 //HSV
-#define getValue(img,i,j) (((uchar *)(img->imageData + i*img->widthStep))[j*img->nChannels + 2]) / 255.0 //[0..1]
+#define getHsvValue(img,i,j) (((uchar *)(img->imageData + i*img->widthStep))[j*img->nChannels + 2]) / 255.0 //[0..1]
 #define getSaturation(img,i,j) (((uchar *)(img->imageData + i*img->widthStep))[j*img->nChannels + 1]) / 255.0 //[0..1]
 #define getHue(img,i,j) 2*(((uchar *)(img->imageData + i*img->widthStep))[j*img->nChannels + 0]) //[0..360]
 
