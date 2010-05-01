@@ -41,7 +41,7 @@
 
 void normalizeInputs( double*, double*, double* );
 void normalizeInput( double* );
-double abs( double x );
+//double abs( double x );
 std::string getColorSpaceString( int );
 std::string getMetrixFileName( int , int , int , std::string, int  );
 std::string getNNFileName( int , int , int , std::string , int  );

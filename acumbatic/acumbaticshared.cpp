@@ -1,8 +1,6 @@
 #include "acumbaticshared.h"
 #include "cvutils.h"
 
-using namespace std;
-
 void normalizeInputs( double *ch1, double *ch2, double *ch3 ) {
 	normalizeInput(ch1);
 	normalizeInput(ch2);
@@ -13,11 +11,11 @@ void normalizeInput( double *i ) {
 	(*i) = (*i) * (MAX_INPUT_RANGE - MIN_INPUT_RANGE) + MIN_INPUT_RANGE;
 }
 
-double abs( double x ) {
-	return (x>=0)?x:-x;
-}
+//double abs( double x ) {
+//	return (x>=0)?x:-x;
+//}
 
-string getColorSpaceString( int colorspace ) {
+std::string getColorSpaceString( int colorspace ) {
 	switch (colorspace) {
 		case RGB: return "RGB"; break;
 		case HSV: return "HSV"; break;
@@ -30,24 +28,24 @@ string getColorSpaceString( int colorspace ) {
 	}
 }
 
-string getMetrixFileName( int colorspace, int numberOfLevels, int windowSize, string positionDescription, int hiddenNeurons ) { 
+std::string getMetrixFileName( int colorspace, int numberOfLevels, int windowSize, std::string positionDescription, int hiddenNeurons ) {
 	return getFileName( METRIX_FILE_PREFIX, METRIX_FILE_SEP, colorspace, numberOfLevels, windowSize, positionDescription, hiddenNeurons );
 }
 
-string getNNFileName( int colorspace, int numberOfLevels, int windowSize, string positionDescription, int hiddenNeurons ) { 
+std::string getNNFileName( int colorspace, int numberOfLevels, int windowSize, std::string positionDescription, int hiddenNeurons ) {
 	return getFileName( ANN_FILE_PREFIX, ANN_FILE_SEP, colorspace, numberOfLevels, windowSize, positionDescription, hiddenNeurons );
 }
 
-string getThFileName( int colorspace, int numberOfLevels, int windowSize, string positionDescription, int hiddenNeurons ) { 
+std::string getThFileName( int colorspace, int numberOfLevels, int windowSize, std::string positionDescription, int hiddenNeurons ) {
 	return getFileName( TH_FILE_PREFIX, TH_FILE_SEP, colorspace, numberOfLevels, windowSize, positionDescription, hiddenNeurons );
 }
 
-string getResultFileName( int colorspace, int numberOfLevels, int windowSize, string positionDescription, int hiddenNeurons ) {
+std::string getResultFileName( int colorspace, int numberOfLevels, int windowSize, std::string positionDescription, int hiddenNeurons ) {
 	return getFileName( RESULT_FILE_PREFIX, RESULT_FILE_SEP, colorspace, numberOfLevels, windowSize, positionDescription, hiddenNeurons ); 
 }
 
-string getFileName( string prefix, string separator, int colorspace, int numberOfLevels, int windowSize, string positionDescription, int hiddenNeurons ) {
-	string fileName = prefix;
+std::string getFileName( std::string prefix, std::string separator, int colorspace, int numberOfLevels, int windowSize, std::string positionDescription, int hiddenNeurons ) {
+	std::string fileName = prefix;
 	fileName = fileName + separator + getColorSpaceString( colorspace );
 	char buff[10];
 	sprintf(buff,"%d",numberOfLevels);
