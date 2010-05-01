@@ -1,4 +1,5 @@
 #include "TrainPattern.h"
+#include <stdio.h>
 
 TrainPattern::TrainPattern(double ch1, double ch2, double ch3) {
 	this->ch1 = ch1;
