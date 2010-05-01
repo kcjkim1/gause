@@ -226,7 +226,7 @@ double Image::getSaturationChannel( int i, int j ) {
 }
 
 double Image::getValueChannel( int i, int j ) {
-	return getValue( img, i, j );
+	return getHsvValue( img, i, j );
 }
 //--
 int Image::getLumaChannel( int i, int j ) {
