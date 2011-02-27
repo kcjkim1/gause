@@ -1,6 +1,9 @@
 /***************************************************************************
- *   Copyright (C) 2006 by Mian Zhou   *
- *   M.Zhou@reading.ac.uk   *
+ *   Copyright (C) 2006 by Mian Zhou                                       *
+ *   M.Zhou@reading.ac.uk                                                  *
+ *                                                                         *
+ *   Modified by Fernando Cardoso (fernandohbc@gmail.com) in February 26,  *
+ *   2011, where explicitly noted.                                         *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -287,7 +290,9 @@ IplImage* CvGabor::get_image(int Type)
     
     CvMat* kernel = cvCreateMat(Width, Width, CV_32FC1);
     double ve;
-    CvScalar S;
+    // Modified by Fernando Cardoso (fernandohbc@gmail.com)
+    // The line below has been commented
+    // CvScalar S;
     CvSize size = cvGetSize( kernel );
     int rows = size.height;
     int cols = size.width;
@@ -481,6 +486,9 @@ CvMat* CvGabor::get_matrix(int Type)
         return NULL;
         break;
     }
+    // Modified by Fernando Cardoso (fernandohbc@gmail.com)
+    // The line below has been added
+    return NULL;
 }
 
 
@@ -652,7 +660,9 @@ void CvGabor::normalize( const CvArr* src, CvArr* dst, double a, double b, int n
     CvMat* tmp = 0;
     __BEGIN__;
 
-    double scale, shift;
+    // Modified by Fernando Cardoso (fernandohbc@gmail.com)
+    // The variables scale and shift have been initalized
+    double scale = 0, shift = 0;
     
     if( norm_type == CV_MINMAX )
     {
@@ -664,7 +674,9 @@ void CvGabor::normalize( const CvArr* src, CvArr* dst, double a, double b, int n
     }
     else if( norm_type == CV_L2 || norm_type == CV_L1 || norm_type == CV_C )
     {
-        CvMat *s = (CvMat*)src, *d = (CvMat*)dst;
+    	// Modified by Fernando Cardoso (fernandohbc@gmail.com)
+    	// The line below has been commented out
+        // CvMat *s = (CvMat*)src, *d = (CvMat*)dst;
 
         scale = cvNorm( src, 0, norm_type, mask );
         scale = scale > DBL_EPSILON ? 1./scale : 0.;
@@ -678,7 +690,9 @@ void CvGabor::normalize( const CvArr* src, CvArr* dst, double a, double b, int n
         cvConvertScale( src, dst, scale, shift );
     else
     {
-        CvMat stub, *dmat;
+    	// Modified by Fernando Cardoso (fernandohbc@gmail.com)
+    	// The line below has been commented out
+        // CvMat stub, *dmat;
  
        
         cvConvertScale( src, tmp, scale, shift );
@@ -697,7 +711,9 @@ void CvGabor::normalize( const CvArr* src, CvArr* dst, double a, double b, int n
  */
 void CvGabor::conv_img(IplImage *src, IplImage *dst, int Type)
 {
-  double ve, re,im;
+  // Modified by Fernando Cardoso (fernandohbc@gmail.com)
+  // The variables re and im have been commented out
+  double ve; //, re,im;
   
    CvMat *mat = cvCreateMat(src->width, src->height, CV_32FC1);
   for (int i = 0; i < src->width; i++)
