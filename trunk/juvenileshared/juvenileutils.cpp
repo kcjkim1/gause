@@ -1,3 +1,22 @@
+/***************************************************************************
+ *   Copyright (C) 2007-2011 by Fernando Cardoso                           *
+ *   fernandohbc@gmail.com / Twitter: @fernando_hbc                        *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
 #include "juvenileutils.h"
 #include "dirit.h"
 #include "metrics.h"
@@ -10,10 +29,17 @@ void setInFile( std::string resultFileName, double fmeasure ) {
 	fclose(resultFile);
 }
 
+/*
+ * Gets the FMeasure result from the file with given file name.
+ * If the read operation fails, throws an error message.
+ */
 double getFromFile( std::string resultFileName ) {
 	FILE* resultFile = fopen( resultFileName.data(), "r" );
 	float fmeasure;
-	fscanf(resultFile, "%f", &fmeasure);
+	int scanRes = fscanf(resultFile, "%f", &fmeasure);
+	if ( scanRes == EOF ) {
+		throw "Could not read from " + resultFileName;
+	}
 	fclose(resultFile);
 	return fmeasure;
 }
