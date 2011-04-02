@@ -1,3 +1,20 @@
+/*
+ *  GAuSe - An Automatic Image Segmenter Generator
+ *  Copyright (C) 2011 Fernando Cardoso
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include <popt.h>
 #include <iostream>
 
@@ -162,7 +179,7 @@ int main(int argc, const char* argv[]) {
 			delete nn;
 			delete cf;
 		} else {
-			TrainingSet   *ts = NULL;
+			DirectoryTrainingSet   *ts = NULL;
 			Configuration *extant = NULL;			
 			Configuration *cf = new Configuration( colorSpace, levels, windowSize, horizontalFlag, verticalFlag );
 			#ifdef MAIN_DEBUG
@@ -171,11 +188,11 @@ int main(int argc, const char* argv[]) {
 			if ( fileExists(TRAIN_FILE) && fileExists(VALIDATION_FILE) && fileExists(CONFIG_FILE_NAME) && 
 			     cf->isCompatible(extant = new Configuration(CONFIG_FILE_NAME) ) ) {
                    cout << "Found a compatible training set. Will use it!" << endl;
-				   ts = new TrainingSet( extant, horatio, delFiles );
+				   ts = new DirectoryTrainingSet( extant, horatio, delFiles );
 				
 			} else {
 				cout << "Creating Training Set for specified configuration" << endl;
-				ts = new TrainingSet( trainingDirectory, cf, rndConf, horatio, delFiles );								
+				ts = new DirectoryTrainingSet( trainingDirectory, cf, rndConf, horatio, delFiles );								
 				#ifdef MAIN_DEBUG
 					cout << "Training Set Created" << endl;
 				#endif

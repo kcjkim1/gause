@@ -1,3 +1,20 @@
+/*
+ *  GAuSe - An Automatic Image Segmenter Generator
+ *  Copyright (C) 2011 Fernando Cardoso
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include "training.h"
 #include "dirit.h"
 #include "extractor.h"
@@ -5,7 +22,7 @@
 
 //rndConf says how many images it will use from the imageset
 //kflod specifies the number of crossvalidations to be performed
-TrainingSet::TrainingSet( char *trainingDirectory, Configuration* configuration, int rndConf, int horatio, bool delFiles ) {	
+DirectoryTrainingSet::DirectoryTrainingSet( char *trainingDirectory, Configuration* configuration, int rndConf, int horatio, bool delFiles ) {	
 	setConfiguration( configuration );
 	DirectoryIterator *di = new DirectoryIterator( trainingDirectory );
 	FeatureExtractor *fe = new FeatureExtractor( this->configuration, horatio );
@@ -39,7 +56,7 @@ TrainingSet::TrainingSet( char *trainingDirectory, Configuration* configuration,
 	delete di;
 }
 
-TrainingSet::TrainingSet( Configuration* configuration, int horatio, bool delFiles ) {	
+DirectoryTrainingSet::DirectoryTrainingSet( Configuration* configuration, int horatio, bool delFiles ) {	
 	setConfiguration( configuration );	
     this->delFiles = delFiles;
     
@@ -48,7 +65,7 @@ TrainingSet::TrainingSet( Configuration* configuration, int horatio, bool delFil
 	validationData = fann_read_train_from_file(VALIDATION_FILE);
 }
 
-TrainingSet::~TrainingSet() {
+DirectoryTrainingSet::~DirectoryTrainingSet() {
 	if ( delFiles ) {
 		remove(TRAIN_FILE);
 		remove(VALIDATION_FILE);
@@ -57,23 +74,23 @@ TrainingSet::~TrainingSet() {
 	fann_destroy_train( validationData );
 }
 
-fann_train_data* TrainingSet::getTrainingData( ) {
+fann_train_data* DirectoryTrainingSet::getTrainingData( ) {
 	return trainingData;
 }
 
-fann_train_data* TrainingSet::getValidationData() {	
+fann_train_data* DirectoryTrainingSet::getValidationData() {	
 	return validationData;
 }
 
-void TrainingSet::setConfiguration(Configuration* config) {
+void DirectoryTrainingSet::setConfiguration(Configuration* config) {
 	this->configuration = config;
 }
 
-long TrainingSet::getQtdValidationSamples() {
+long DirectoryTrainingSet::getQtdValidationSamples() {
 	return this->qtdValidationSamples;
 }
 
-long TrainingSet::countValidationSamples(const char* fileName) {
+long DirectoryTrainingSet::countValidationSamples(const char* fileName) {
 	FILE* file = fopen(fileName, "r");
 	long result;
 	fscanf( file, "%ld", &result );

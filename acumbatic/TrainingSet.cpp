@@ -15,33 +15,22 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "config.h"
-#include <fann.h>
-#include <floatfann.h>
 #include "TrainingSet.h"
 
-#ifndef TRAINING_H_
-#define TRAINING_H_
+TrainingSet::TrainingSet() {
+}
 
-class DirectoryTrainingSet : public TrainingSet {
-	public: 
-		DirectoryTrainingSet( char*, Configuration*, int, int, bool );
-		DirectoryTrainingSet( Configuration*, int, bool );
-	   ~DirectoryTrainingSet();
-	   
-	   virtual fann_train_data *getTrainingData();
-	   virtual long getQtdValidationSamples();
-	   virtual fann_train_data *getValidationData();
-	   
-	   void saveValidationData();
-	private:
-		bool delFiles;
-		Configuration *configuration;
-		void setConfiguration( Configuration* );
-		fann_train_data * trainingData;
-		long qtdValidationSamples;
-		long countValidationSamples(const char *);
-		fann_train_data * validationData;
-};
+TrainingSet::~TrainingSet() {
+}
 
-#endif /*TRAINING_H_*/
+fann_train_data * TrainingSet::getTrainingData() {
+    return NULL;
+}
+
+long TrainingSet::getQtdValidationSamples() {
+    return NULL;
+}
+
+fann_train_data * TrainingSet::getValidationData() {
+    return 0;
+}
