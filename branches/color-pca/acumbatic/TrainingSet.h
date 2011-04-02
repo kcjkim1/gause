@@ -15,33 +15,25 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "config.h"
+#ifndef TRAININGSET_H_
+#define TRAININGSET_H_
+
 #include <fann.h>
 #include <floatfann.h>
-#include "TrainingSet.h"
 
-#ifndef TRAINING_H_
-#define TRAINING_H_
+/**
+ * Abstract class for the training sets that uses fann data.
+ * This separates training set abstractions from detailed implementations,
+ * such as ArrfTrainingSet and DirectoryTraningSet.
+ */
+class TrainingSet {
+public:
+    TrainingSet();
+    virtual ~TrainingSet();
 
-class DirectoryTrainingSet : public TrainingSet {
-	public: 
-		DirectoryTrainingSet( char*, Configuration*, int, int, bool );
-		DirectoryTrainingSet( Configuration*, int, bool );
-	   ~DirectoryTrainingSet();
-	   
-	   virtual fann_train_data *getTrainingData();
-	   virtual long getQtdValidationSamples();
-	   virtual fann_train_data *getValidationData();
-	   
-	   void saveValidationData();
-	private:
-		bool delFiles;
-		Configuration *configuration;
-		void setConfiguration( Configuration* );
-		fann_train_data * trainingData;
-		long qtdValidationSamples;
-		long countValidationSamples(const char *);
-		fann_train_data * validationData;
+    virtual fann_train_data *getTrainingData();
+    virtual long getQtdValidationSamples();
+    virtual fann_train_data *getValidationData();
 };
 
-#endif /*TRAINING_H_*/
+#endif /* TRAININGSET_H_ */
