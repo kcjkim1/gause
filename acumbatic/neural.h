@@ -15,16 +15,17 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "config.h"
+
+#ifndef NEURAL_H_
+#define NEURAL_H_
+
+#include "Configuration.h"
 #include "TrainingSet.h"
 #include "img.h"
 #include <iostream>
 
 #include <fann.h>
 #include <floatfann.h>
-
-#ifndef NEURAL_H_
-#define NEURAL_H_
 
 class NeuralNetwork {
 	public:

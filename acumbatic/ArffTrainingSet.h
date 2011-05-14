@@ -15,38 +15,23 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
- 
-#include "handle.h"
-#include "Configuration.h"
-#include "neural.h"
-#include "img.h"
-#include "acumbaticshared.h"
 
-#include <iostream>
+#ifndef ARFFTRAININGSET_H_
+#define ARFFTRAININGSET_H_
 
-#ifndef METRICS_H_
-#define METRICS_H_
+#include "TrainingSet.h"
 
-class MetricsExtractor : public CallbackHandler {
-	public:
-		MetricsExtractor( NeuralNetwork*);
-		virtual void handle( const char*, const char* );
-		void init();
-		void close();
-	private:
-		#ifdef METRIX_DEBUG
-			Image* prove;
-		#endif
-	    FILE* metrix;
-		long stuff, nonStuff, tp, fp, tn, fn;
-		NeuralNetwork* nn;
-		void setNeuralNetwork(NeuralNetwork*);
-		long getStuff(Image*);
-		long getNonStuff(Image*);
-		long getTp(Image*, Image*);
-		long getFp(Image*, Image*);
-		long getTn(Image*, Image*);
-		long getFn(Image*, Image*);
+class ArffTrainingSet : public TrainingSet {
+public:
+	ArffTrainingSet(char *);
+	virtual ~ArffTrainingSet();
+	virtual fann_train_data *getTrainingData();
+	virtual long getQtdValidationSamples();
+    virtual fann_train_data *getValidationData();
+private:
+	void readFromArff(char*);
+	fann_train_data * trainingSet;
+	fann_train_data * validationSet;
 };
 
-#endif /*METRICS_H_*/
+#endif /* ARFFTRAININGSET_H_ */
