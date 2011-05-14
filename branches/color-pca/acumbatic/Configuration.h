@@ -15,38 +15,23 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
- 
-#include "handle.h"
-#include "Configuration.h"
-#include "neural.h"
-#include "img.h"
-#include "acumbaticshared.h"
+
+#ifndef CONFIGURATION_H_
+#define CONFIGURATION_H_
 
 #include <iostream>
+#include "img.h"
 
-#ifndef METRICS_H_
-#define METRICS_H_
-
-class MetricsExtractor : public CallbackHandler {
-	public:
-		MetricsExtractor( NeuralNetwork*);
-		virtual void handle( const char*, const char* );
-		void init();
-		void close();
-	private:
-		#ifdef METRIX_DEBUG
-			Image* prove;
-		#endif
-	    FILE* metrix;
-		long stuff, nonStuff, tp, fp, tn, fn;
-		NeuralNetwork* nn;
-		void setNeuralNetwork(NeuralNetwork*);
-		long getStuff(Image*);
-		long getNonStuff(Image*);
-		long getTp(Image*, Image*);
-		long getFp(Image*, Image*);
-		long getTn(Image*, Image*);
-		long getFn(Image*, Image*);
+class Configuration {
+public:
+    Configuration();
+    virtual ~Configuration();
+    virtual std::string getColorSpaceAndPositionDescription() = 0;
+    virtual int getWindowSize() = 0;
+    virtual int getNumberOfLevels() = 0;
+    virtual int getDimension() = 0;
+    virtual void preprocess(Image *) = 0;
+    virtual void fillInput(float[], Image*, int, int) = 0;
 };
 
-#endif /*METRICS_H_*/
+#endif /* CONFIGURATION_H_ */

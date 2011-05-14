@@ -15,6 +15,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+ 
 #include "neural.h"
 #include "acumbaticshared.h"
 #include "dirit.h"
@@ -57,9 +58,9 @@ void NeuralNetwork::train(TrainingSet* ts, int trainingIterations,
     fann_train_data *trainingData = this->ts->getTrainingData();
     fann_train_data *validationData = this->ts->getValidationData();
     for (int i = 0; i < trainingIterations; i++) {
-        cout << "Training Neural Network for " << getColorSpaceString(
-                this->configuration->getColorSpace()) << " with "
-                << this->configuration->getNumberOfLevels();
+        cout << "Training Neural Network for "
+                << this->configuration->getColorSpaceAndPositionDescription()
+                << " with " << this->configuration->getNumberOfLevels();
         cout << " levels of quantization and window size "
                 << this->configuration->getWindowSize() << ". Hidden Neurons: "
                 << this->hiddenNeurons << ". Iteration " << i << endl;
@@ -99,10 +100,10 @@ void NeuralNetwork::train(TrainingSet* ts, int trainingIterations,
 
 void NeuralNetwork::saveMetrix(double detectionRate, double precision,
         double fMeasure) {
-    string fileName = getMetrixFileName(this->configuration->getColorSpace(),
+    string fileName = getMetrixFileName(
+            this->configuration->getColorSpaceAndPositionDescription(),
             this->configuration->getNumberOfLevels(),
-            this->configuration->getWindowSize(),
-            this->configuration->getPositionDescription(), this->hiddenNeurons);
+            this->configuration->getWindowSize(), this->hiddenNeurons);
 
     FILE* mFile = fopen(fileName.data(), "w");
     fprintf(mFile, "%f\n%f\n%f\n", detectionRate, precision, fMeasure);
@@ -265,34 +266,16 @@ Configuration* NeuralNetwork::getConfiguration() {
 
 Image* NeuralNetwork::apply(Image* img) {
     int dim = this->getConfiguration()->getDimension();
+    this->getConfiguration()->preprocess(img);
+
     Image* res = new Image(img->getWidth(), img->getHeight());
-    img->smooth(this->getConfiguration()->getWindowSize());
-    img->convert(this->configuration->getColorSpace());
 #ifdef NN_DEBUG
     img->showAndWait("Imagem");
 #endif
     for (int i = 0; i < img->getHeight(); i++) {
         for (int j = 0; j < img->getWidth(); j++) {
-            double ch[3];
-            ch[0] = img->getNomalizedChannel(1, i, j);
-            ch[1] = img->getNomalizedChannel(2, i, j);
-            ch[2] = img->getNomalizedChannel(3, i, j);
-            normalizeInputs(&ch[0], &ch[1], &ch[2]);
-
             float input[dim];
-            input[0] = (float) ch[0];
-            input[1] = (float) ch[1];
-            input[2] = (float) ch[2];
-            if (this->getConfiguration()->usesHorizontal()
-                    && this->getConfiguration()->usesVertical()) {
-                input[3] = img->getNormalizedHorizontal(j);
-                input[4] = img->getNormalizedVertical(i);
-            } else if (this->getConfiguration()->usesHorizontal()) {
-                input[3] = img->getNormalizedHorizontal(j);
-            } else if (this->getConfiguration()->usesVertical()) {
-                input[3] = img->getNormalizedVertical(i);
-            }
-
+            this->getConfiguration()->fillInput(input, img, i, j);
             int result = applyAnn(this->nn, input, this->th);
 
             if (result == STUFF_RESULT) {
@@ -306,16 +289,14 @@ Image* NeuralNetwork::apply(Image* img) {
 }
 
 void NeuralNetwork::save() {
-    string fileName = getNNFileName(this->configuration->getColorSpace(),
+    string fileName = getNNFileName(
+            this->configuration->getColorSpaceAndPositionDescription(),
             this->configuration->getNumberOfLevels(),
-            this->configuration->getWindowSize(),
-            this->getConfiguration()->getPositionDescription(),
-            this->hiddenNeurons);
-    string thFileName = getThFileName(this->configuration->getColorSpace(),
+            this->configuration->getWindowSize(), this->hiddenNeurons);
+    string thFileName = getThFileName(
+            this->configuration->getColorSpaceAndPositionDescription(),
             this->configuration->getNumberOfLevels(),
-            this->configuration->getWindowSize(),
-            this->getConfiguration()->getPositionDescription(),
-            this->hiddenNeurons);
+            this->configuration->getWindowSize(), this->hiddenNeurons);
     fann_save(this->nn, fileName.data());
 
     FILE* thFile = fopen(thFileName.data(), "w");
@@ -324,11 +305,10 @@ void NeuralNetwork::save() {
 }
 
 void NeuralNetwork::initResults() {
-    string fileName = getResultFileName(this->configuration->getColorSpace(),
+    string fileName = getResultFileName(
+            this->configuration->getColorSpaceAndPositionDescription(),
             this->configuration->getNumberOfLevels(),
-            this->configuration->getWindowSize(),
-            this->getConfiguration()->getPositionDescription(),
-            this->hiddenNeurons);
+            this->configuration->getWindowSize(), this->hiddenNeurons);
     resultFile = fopen(fileName.data(), "w");
     fprintf(resultFile, "%s\t%s\t%s\t%s\n", "Iteration", "Dr", "P", "Fm");
 }

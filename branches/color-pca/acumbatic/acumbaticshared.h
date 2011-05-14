@@ -1,13 +1,23 @@
 #include <string>
- 
+/*
+ *  GAuSe - An Automatic Image Segmenter Generator
+ *  Copyright (C) 2011 Fernando Cardoso
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #ifndef ACUMBATICSHARED_H_
 #define ACUMBATICSHARED_H_
-
-//#define MAIN_DEBUG
-//#define TS_DEBUG
-//#define DEBUG
-//#define NN_DEBUG
-//#define METRIX_DEBUG
 
 #define MIN_INPUT_RANGE -1.0
 #define MAX_INPUT_RANGE 1.0
@@ -39,16 +49,14 @@
 #define TH_FILE_SEP "_"
 #define RESULT_FILE_SEP "_"
 
-void normalizeInputs( double*, double*, double* );
-void normalizeInput( double* );
-//double abs( double x );
-std::string getColorSpaceString( int );
-std::string getMetrixFileName( int , int , int , std::string, int  );
-std::string getNNFileName( int , int , int , std::string , int  );
-std::string getThFileName( int , int , int , std::string , int  );
-std::string getResultFileName( int , int , int , std::string , int  );
-std::string getFileName(std::string, std::string, int , int , int , std::string , int  );
-double getFMeasure( double, double );
-
+void normalizeInputs(double*, double*, double*);
+void normalizeInput(double*);
+std::string getColorSpaceString(int);
+std::string getMetrixFileName(std::string, int, int, int);
+std::string getNNFileName(std::string, int, int, int);
+std::string getThFileName(std::string, int, int, int);
+std::string getResultFileName(std::string, int, int, int);
+std::string getFileName(std::string, std::string, std::string, int, int, int);
+double getFMeasure(double, double);
 
 #endif /*ACUMBATICSHARED_H_*/

@@ -15,7 +15,8 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "config.h"
+ 
+#include "SerialConfiguration.h"
 #include <fann.h>
 #include <floatfann.h>
 #include "TrainingSet.h"
@@ -25,8 +26,8 @@
 
 class DirectoryTrainingSet : public TrainingSet {
 	public: 
-		DirectoryTrainingSet( char*, Configuration*, int, int, bool );
-		DirectoryTrainingSet( Configuration*, int, bool );
+		DirectoryTrainingSet( char*, SerialConfiguration*, int, int, bool );
+		DirectoryTrainingSet( SerialConfiguration*, int, bool );
 	   ~DirectoryTrainingSet();
 	   
 	   virtual fann_train_data *getTrainingData();
@@ -36,12 +37,14 @@ class DirectoryTrainingSet : public TrainingSet {
 	   void saveValidationData();
 	private:
 		bool delFiles;
-		Configuration *configuration;
-		void setConfiguration( Configuration* );
+		SerialConfiguration *configuration;
+		void setConfiguration( SerialConfiguration* );
 		fann_train_data * trainingData;
 		long qtdValidationSamples;
-		long countValidationSamples(const char *);
 		fann_train_data * validationData;
+		long countValidationSamples(const char *);
+	protected :
+		void initFannFiles();
 };
 
 #endif /*TRAINING_H_*/

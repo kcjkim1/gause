@@ -15,6 +15,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+ 
 #include "training.h"
 #include "dirit.h"
 #include "extractor.h"
@@ -22,7 +23,7 @@
 
 //rndConf says how many images it will use from the imageset
 //kflod specifies the number of crossvalidations to be performed
-DirectoryTrainingSet::DirectoryTrainingSet( char *trainingDirectory, Configuration* configuration, int rndConf, int horatio, bool delFiles ) {	
+DirectoryTrainingSet::DirectoryTrainingSet( char *trainingDirectory, SerialConfiguration* configuration, int rndConf, int horatio, bool delFiles ) {
 	setConfiguration( configuration );
 	DirectoryIterator *di = new DirectoryIterator( trainingDirectory );
 	FeatureExtractor *fe = new FeatureExtractor( this->configuration, horatio );
@@ -48,21 +49,25 @@ DirectoryTrainingSet::DirectoryTrainingSet( char *trainingDirectory, Configurati
 	fe->consolidate();
 	this->delFiles = delFiles;
 	
-	trainingData = fann_read_train_from_file(TRAIN_FILE);
-	this->qtdValidationSamples = fe->getQtdValidationSamples();
-	validationData = fann_read_train_from_file(VALIDATION_FILE);
 	
+    this -> initFannFiles();
+
 	delete fe;
 	delete di;
 }
 
-DirectoryTrainingSet::DirectoryTrainingSet( Configuration* configuration, int horatio, bool delFiles ) {	
-	setConfiguration( configuration );	
+DirectoryTrainingSet::DirectoryTrainingSet( SerialConfiguration* configuration, int horatio, bool delFiles ) {
+	setConfiguration( configuration );
     this->delFiles = delFiles;
+    this -> initFannFiles();
     
+}
+
+void DirectoryTrainingSet::initFannFiles(){
 	trainingData = fann_read_train_from_file(TRAIN_FILE);
 	this->qtdValidationSamples = countValidationSamples(VALIDATION_FILE);
 	validationData = fann_read_train_from_file(VALIDATION_FILE);
+
 }
 
 DirectoryTrainingSet::~DirectoryTrainingSet() {
@@ -82,7 +87,7 @@ fann_train_data* DirectoryTrainingSet::getValidationData() {
 	return validationData;
 }
 
-void DirectoryTrainingSet::setConfiguration(Configuration* config) {
+void DirectoryTrainingSet::setConfiguration(SerialConfiguration* config) {
 	this->configuration = config;
 }
 
