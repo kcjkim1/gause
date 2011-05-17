@@ -41,9 +41,11 @@ void ArffTrainingSet::readFromArff(char *arffFile) {
     int num_output = 2;
     long result = 0;
     bool flagData = false;
+    int p_classes = 0;
+    int n_classes = 0;
 
     std::ifstream arff;
-
+std::cout << "lendo arquivo pca .arff";
     arff.open(arffFile);
     if (arff.is_open()) {
         while (arff.good()) {
@@ -60,6 +62,11 @@ void ArffTrainingSet::readFromArff(char *arffFile) {
                 }
             } else {
                 result++;
+                if(line.substr(line.size() - 1) == "P" ){
+                	p_classes++;
+                }else{
+                	n_classes++;
+                }
             }
         }
 
@@ -69,7 +76,6 @@ void ArffTrainingSet::readFromArff(char *arffFile) {
 
     //Para tirar o atributo da classe(P/N) colocado indevidamente
     num_input--;
-
     //Criando arquivo .dat
     std::ofstream datFile;
     datFile.open(TRAIN_FILE);
