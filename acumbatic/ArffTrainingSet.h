@@ -20,18 +20,22 @@
 #define ARFFTRAININGSET_H_
 
 #include "TrainingSet.h"
+#include "ArffConfiguration.h"
 
 class ArffTrainingSet : public TrainingSet {
 public:
-	ArffTrainingSet(char *);
+	ArffTrainingSet(char *, ArffConfiguration*, int);
+	ArffConfiguration *configuration;
+	void setConfiguration(ArffConfiguration*);
 	virtual ~ArffTrainingSet();
 	virtual fann_train_data *getTrainingData();
 	virtual long getQtdValidationSamples();
     virtual fann_train_data *getValidationData();
 private:
-	void readFromArff(char*);
+	void readFromArff(char*,int);
 	fann_train_data * trainingSet;
 	fann_train_data * validationSet;
+	long qtdValidationSamples;
 };
 
 #endif /* ARFFTRAININGSET_H_ */

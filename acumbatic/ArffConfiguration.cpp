@@ -31,10 +31,11 @@ struct colorPCA {
 
 };
 
-colorPCA colorSpacePCA;
+//colorPCA colorSpacePCA;
 
-ArffConfiguration::ArffConfiguration(int colorSpace, int numberOfLevels,int windowSize) {
-
+ArffConfiguration::ArffConfiguration( int numberOfLevels,int windowSize) {
+	this->numberOfLevels = numberOfLevels;
+	this->windowSize = windowSize;
 }
 
 ArffConfiguration::ArffConfiguration(string fileName) {
@@ -45,17 +46,36 @@ int ArffConfiguration::getWindowSize() {
     return windowSize;
 }
 
-colorPCA ArffConfiguration::getColorSpace() {
+double* ArffConfiguration::getColorPCA(int channel,int r,int g,int b) {
 	 //this->colorSpacePCA
-    return null;
+    return 0;
 }
 
 int ArffConfiguration::getNumberOfLevels() {
     return this->numberOfLevels;
 }
 
-void ArffConfiguration::setColorSpace(int colorSpace,int canal) {
-  //  this->colorSpacePCA.colorSpace = colorSpace;
+void ArffConfiguration::setColorPCA(std::string colorSpace,int canal) {
+	switch (canal) {
+		case 1:
+			this->colorSpacePCA.channel1 = colorSpace;
+			break;
+		case 2:
+			this->colorSpacePCA.channel2 = colorSpace;
+					break;
+		case 3:
+			this->colorSpacePCA.channel3 = colorSpace;
+					break;
+		case 4:
+			this->colorSpacePCA.channel4 = colorSpace;
+					break;
+		case 5:
+			this->colorSpacePCA.channel5 = colorSpace;
+					break;
+
+		default:
+			break;
+	}
 }
 
 void ArffConfiguration::setNumberOfLevels(int numberOfLevels) {
@@ -72,27 +92,24 @@ void ArffConfiguration::save() {
 
 
 bool ArffConfiguration::isCompatible(ArffConfiguration * other) {
-    return 	(this->colorSpace) == (other->getColorSpace())
-            && (this->numberOfLevels) == (other->getNumberOfLevels())
-            && (this->windowSize) == (other->getWindowSize());
+	bool checkWindowAndLevels = (this->numberOfLevels) == (other->getNumberOfLevels())
+		            && (this->windowSize) == (other->getWindowSize());
+	bool colorCheck = this->colorSpacePCA.channel1 == other->colorSpacePCA.channel1 &&
+			this->colorSpacePCA.channel2 == other->colorSpacePCA.channel2 &&
+			this->colorSpacePCA.channel3 == other->colorSpacePCA.channel3 &&
+			this->colorSpacePCA.channel4 == other->colorSpacePCA.channel4 &&
+			this->colorSpacePCA.channel5 == other->colorSpacePCA.channel5;
+
+	return checkWindowAndLevels && colorCheck;
 }
 
-void ArffConfiguration::preprocess(Image * img) {
-  //  img->smooth(this->getWindowSize());
-   // img->convert(this->getColorSpace());
-}
+
 
 double convertChannel(int inSpace,int outSpace,int r,int g, int b){
 
 	//rgb2xyz
 	if(outSpace >= 3 && outSpace <= 5){
-		if(outSpace ==3){
 
-		}else if(outSpace == 4){
-
-		}else{
-
-		}
 	}
 	//rgb2ycbcr
 	if(outSpace >= 6 && outSpace <= 8){

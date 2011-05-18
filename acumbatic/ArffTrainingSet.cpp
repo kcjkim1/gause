@@ -22,8 +22,13 @@
 #include <string>
 #include "acumbaticshared.h"
 
-ArffTrainingSet::ArffTrainingSet(char *arffFile) {
-    readFromArff(arffFile);
+
+
+
+
+ArffTrainingSet::ArffTrainingSet(char *arffFile,ArffConfiguration* config , int horatio ) {
+	this->configuration = config;
+    readFromArff(arffFile,horatio);
     //initFannFiles();
 }
 
@@ -34,7 +39,12 @@ fann_train_data * trainingData;
 long qtdValidationSamples;
 fann_train_data * validationData;
 
-void ArffTrainingSet::readFromArff(char *arffFile) {
+void ArffTrainingSet::setConfiguration(ArffConfiguration* config){
+	this->configuration = config;
+}
+
+
+void ArffTrainingSet::readFromArff(char *arffFile,int holdoutRatio) {
 
     std::string line;
     int num_input = 0;
@@ -133,7 +143,7 @@ fann_train_data * ArffTrainingSet::getTrainingData() {
 
 long ArffTrainingSet::getQtdValidationSamples() {
     // TODO: Retornar a quantidade de pontos presentes em validation.dat
-    return NULL;
+    return this->qtdValidationSamples;
 }
 
 fann_train_data * ArffTrainingSet::getValidationData() {
