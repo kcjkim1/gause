@@ -43,6 +43,7 @@
 #include "dirit.h"
 #include "ArffTrainingSet.h"
 #include "SerialConfiguration.h"
+#include "ArffConfiguration.h"
 
 using namespace std;
 
@@ -252,8 +253,9 @@ int main(int argc, const char* argv[]) {
              */
             TrainingSet *ts = NULL;
             if (arffflag) {
+            	ArffConfiguration *arffCf = new ArffConfiguration(levels,windowSize);
                 ts
-                        = new ArffTrainingSet(arfffile);
+                        = new ArffTrainingSet(arfffile,arffCf,10);
             } else {
                 SerialConfiguration *extant = NULL;
                 SerialConfiguration *cf = new SerialConfiguration(colorSpace, levels,

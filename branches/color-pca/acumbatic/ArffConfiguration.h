@@ -60,9 +60,9 @@
  20=LUV-V
 
  */
-class ArffConfiguration: public Configuration {
+class ArffConfiguration : public Configuration {
 
-
+public:
 	struct colorPCA {
 		std::string channel1;
 		std::string channel2;
@@ -71,16 +71,14 @@ class ArffConfiguration: public Configuration {
 		std::string channel5;
 
 	};
-public:
-	ArffConfiguration(int, int, int);
+	ArffConfiguration(int, int);
 	ArffConfiguration(std::string);
 	virtual int getWindowSize();
 	virtual std::string getColorSpaceAndPositionDescription();
 	virtual int getNumberOfLevels();
-	virtual void preprocess(Image * img);
 	virtual void fillInput(float[], Image*, int, int);
-	colorPCA getColorPCA();
-	void setColorPCA(int);
+	double* getColorPCA(int,int,int,int);
+	void setColorPCA(std::string,int);
 	void save();
 	bool isCompatible(ArffConfiguration*);
 	double* rgb2HSL(int, int, int);
@@ -91,11 +89,10 @@ public:
 	double* rgb2LUV(int, int, int);
 protected:
 	int windowSize;
-	int colorSpace;
+	colorPCA colorSpacePCA;
 	int numberOfLevels;
 	double maxNumber(double, double, double);
 	double minNumber(double, double, double);
-	//void setColorSpace(int);
 	void setNumberOfLevels(int);
 	void setWindowSize(int);
 	double getNormalizedChannel(int, double);
