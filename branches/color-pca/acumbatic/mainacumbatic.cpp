@@ -21,24 +21,6 @@
 #include "acumbaticshared.h"
 #include "neural.h"
 #include "training.h"
-/*
- *  GAuSe - An Automatic Image Segmenter Generator
- *  Copyright (C) 2011 Fernando Cardoso
- *
- *  This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
- 
 #include "Configuration.h"
 #include "dirit.h"
 #include "ArffTrainingSet.h"
@@ -246,10 +228,10 @@ int main(int argc, const char* argv[]) {
             delete nn;
             delete cf;
         } else {
-            // Aqui Ž criad o trainig set
+            // Aqui ï¿½ criad o trainig set
             /*
-             * O que precisa fazer Ž: se for o arrfflag, criar um trainingset do tipo ARffTRainignset, sen‹o, deixa o c—digo
-             * que j‡ est‡.
+             * O que precisa fazer ï¿½: se for o arrfflag, criar um trainingset do tipo ARffTRainignset, senï¿½o, deixa o cï¿½digo
+             * que jï¿½ estï¿½.
              */
             TrainingSet *ts = NULL;
             if (arffflag) {

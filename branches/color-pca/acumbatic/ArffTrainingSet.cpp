@@ -90,7 +90,7 @@ std::cout << "lendo arquivo pca .arff";
     std::ofstream datFile;
     datFile.open(TRAIN_FILE);
 
-    //colocando cabealho --->  Nœmero de amostras - numero de inputs - numero de outputs
+    //colocando cabeÃ§alho --->  NÃºmero de amostras - numero de inputs - numero de outputs
     datFile << result << " " << num_input << " " << num_output << std::endl;
 
     std::string out;
