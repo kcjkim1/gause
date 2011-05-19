@@ -20,44 +20,44 @@
 #define ARFFCONFIGURATION_H_
 
 
-#define RGB-R 0
-#define RGB-G 1
-#define RGB-B 2
-#define XYZ-X 3
-#define XYZ-Y 4
-#define XYZ-Z 5
-#define YCbCr-Y 6
-#define YCbCr-Cb 7
-#define YCbCr-Cr 8
-#define HSV-H 9
-#define HSV-S 10
-#define HSV-V 11
-#define HSL-H 12
-#define HSL-S 13
-#define HSL-L 14
-#define LAB-L 15
-#define LAB-A 16
-#define LAB-B 17
-#define LUV-L 18
-#define LUV-U 19
-#define LUV-V 20
+#define RGB_R 0
+#define RGB_G 1
+#define RGB_B 2
+#define XYZ_X 3
+#define XYZ_Y 4
+#define XYZ_Z 5
+#define YCbCr_Y 6
+#define YCbCr_Cb 7
+#define YCbCr_Cr 8
+#define HSV_H 9
+#define HSV_S 10
+#define HSV_V 11
+#define HSL_H 12
+#define HSL_S 13
+#define HSL_L 14
+#define LAB_L 15
+#define LAB_A 16
+#define LAB_B 17
+#define LUV_L 18
+#define LUV_U 19
+#define LUV_V 20
 
 
 #include "Configuration.h"
 #include "img.h"
 /*
  //Definition Color Mapping
- 0=RGB-R 			10=HSV-S
- 1=RGB-G				11=HSV-V
- 2=RGB-B				12=HSL-H
- 3=XYZ-X				13=HSL-S
- 4=XYZ-Y				14=HSL-L
- 5=XYZ-Z				15=LAB-L
- 6=YCbCr-Y			16=LAB-A
- 7=YCbCr-Cb			17=LAB-B
- 8=YCbCr-Cr			18=LUV-L
- 9=HSV-H				19=LUV-U
- 20=LUV-V
+ 0=RGB_R 			10=HSV_S
+ 1=RGB_G				11=HSV_V
+ 2=RGB_B				12=HSL_H
+ 3=XYZ_X				13=HSL_S
+ 4=XYZ_Y				14=HSL_L
+ 5=XYZ_Z				15=LAB_L
+ 6=YCbCr_Y			16=LAB_A
+ 7=YCbCr_Cb			17=LAB_B
+ 8=YCbCr_Cr			18=LUV_L
+ 9=HSV_H				19=LUV_U
+ 20=LUV_V
 
  */
 class ArffConfiguration : public Configuration {
@@ -87,6 +87,8 @@ public:
 	double* rgb2YCbCr(int, int, int);
 	double* rgb2LAB(int, int, int);
 	double* rgb2LUV(int, int, int);
+	int getDimension();
+	void preprocess(Image*);
 protected:
 	int windowSize;
 	colorPCA colorSpacePCA;
