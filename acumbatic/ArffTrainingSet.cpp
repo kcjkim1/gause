@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <queue>
 #include "acumbaticshared.h"
 
 
@@ -51,8 +52,8 @@ void ArffTrainingSet::readFromArff(char *arffFile,int holdoutRatio) {
     int num_output = 2;
     long result = 0;
     bool flagData = false;
-    int p_classes = 0;
-    int n_classes = 0;
+    queue<std::string> p;
+    queue<std::string> n;
 
     std::ifstream arff;
 std::cout << "lendo arquivo pca .arff";
@@ -61,9 +62,10 @@ std::cout << "lendo arquivo pca .arff";
         while (arff.good()) {
             getline(arff, line);
             if (!flagData) {
-                //Test @attribute
+                //Pegando os canais
                 if (line.substr(0, 2) == "@a") {
                     num_input++;
+                    this->configuration->setColorPCA(line,num_input);
                     continue;
                 } else
                 //Teste se encontra o @data
@@ -72,11 +74,11 @@ std::cout << "lendo arquivo pca .arff";
                 }
             } else {
                 result++;
-                if(line.substr(line.size() - 1) == "P" ){
-                	p_classes++;
-                }else{
-                	n_classes++;
-                }
+                if (line.substr(line.size() - 1) == "P") {
+                					p.push(line);
+                				} else {
+                					n.push(line);
+                				}
             }
         }
 
@@ -88,50 +90,90 @@ std::cout << "lendo arquivo pca .arff";
     num_input--;
     //Criando arquivo .dat
     std::ofstream datFile;
+    std::ofstream valDatFile;
     datFile.open(TRAIN_FILE);
-
+    valDatFile.open(VALIDATION_FILE);
     //colocando cabe√ßalho --->  N√∫mero de amostras - numero de inputs - numero de outputs
-    datFile << result << " " << num_input << " " << num_output << std::endl;
-
     std::string out;
-    flagData = false;
-    std::string separador = ",";
-        arff.open(arffFile);
-        if (arff.is_open()) {
-            while (arff.good()) {
-                getline(arff, line);
-                if (!flagData) {
+    	flagData = false;
+    	//int proporcao = 0;
+    	queue<std::string>* menor;
+    	queue<std::string>* maior;
+    	if (p.size() > n.size()) {
+    		maior = &p;
+    		menor = &n;
+    	} else {
+    		maior = &n;
+    		menor = &p;
+    	}
+    	int numValDatFile = (menor->size()*2)/(holdoutRatio+1);
+    	int numDatFile = ((menor->size()*2)/(holdoutRatio+1))*holdoutRatio;
 
-                    //Teste se encontra o @data
-                    if (line.substr(0, 2) == "@d") {
-                        flagData = true;
-                    }
-                } else {
+    	datFile << numDatFile << " " << num_input << " " << num_output << std::endl;
+    	valDatFile << numValDatFile << " " << num_input << " " << num_output << std::endl;
+    	this->qtdValidationSamples = numValDatFile;
 
-                    for (int j = 0; j < (line.size() - 1); j++) {
+    	std::string separador = ",";
+    	int count = numDatFile + numValDatFile;
+    	std::cout << "Amostras usadas: " <<count << std::endl;
+    	int countProp = holdoutRatio;
+    	while (count > 0) {
 
-                        if (  line.substr(j, 1).compare(separador)  == 0 ) {
-                            line.replace(j,1, " ");
-                        }
-                    }
-                    out = line.substr(line.size() - 1);
-                    line.replace(line.size() - 1, 1, " ");
-                    datFile << line << std::endl;
-                    if (out == "P") {
-                        datFile << "1.000000" << " -1.000000" << std::endl;
-                    } else {
-                        datFile << "-1.000000" << " 1.000000" << std::endl;
-                    }
+    		//Pego uma vez um elemento P outra um elemento N
+    		if((count % 2) == 0){
+    			line =  maior->front();
+    			maior->pop();
+    			count--;
+    		}else{
+    			line = menor->front();
+    			menor->pop();
+    			count--;
+    		}
 
-                }
-            }
+    		//contator responsável por decidir a hora de colocar no arquivo de validação
+    		if (countProp == 0) {
+    			flagData = true;
+    		} else {
+    			countProp--;
+    		}
 
-        }
+    		//Tirando as vírgulas da linha
+    		for (int j = 0; j < (line.size() - 1); j++) {
 
-        arff.close();
+    			if (line.substr(j, 1).compare(separador) == 0) {
+    				line.replace(j, 1, " ");
+    			}
+    		}
+    		out = line.substr(line.size() - 1);
+    		line.replace(line.size() - 1, 1, " ");
+    		//Verificando se é hora de colocar no arquivo de validação
+    		if (flagData) {
+    			valDatFile << line << std::endl;
+    			if (out == "P") {
+    				valDatFile << "1.000000" << " -1.000000" << std::endl;
+    			} else {
+    				valDatFile << "-1.000000" << " 1.000000" << std::endl;
+    			}
+    			countProp = holdoutRatio;
+    			flagData = false;
+    		} else {
+    			datFile << line << std::endl;
+    			if (out == "P") {
+    				datFile << "1.000000" << " -1.000000" << std::endl;
+    			} else {
+    				datFile << "-1.000000" << " 1.000000" << std::endl;
+    			}
+
+    		}
+
+
+
+    	}
+
 
     //fim for
-    datFile.close();
+    	datFile.close();
+    	valDatFile.close();
 
     this->trainingSet = fann_read_train_from_file(TRAIN_FILE);
     this->validationSet = fann_read_train_from_file(VALIDATION_FILE);

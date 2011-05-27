@@ -26,9 +26,9 @@
 #define XYZ_X 3
 #define XYZ_Y 4
 #define XYZ_Z 5
-#define YCbCr_Y 6
-#define YCbCr_Cb 7
-#define YCbCr_Cr 8
+#define YBR_Y 6
+#define YBR_B 7
+#define YBR_R 8
 #define HSV_H 9
 #define HSV_S 10
 #define HSV_V 11
@@ -41,6 +41,8 @@
 #define LUV_L 18
 #define LUV_U 19
 #define LUV_V 20
+#define POS_V 21
+#define POS_H 22
 
 
 #include "Configuration.h"
@@ -77,19 +79,24 @@ public:
 	virtual std::string getColorSpaceAndPositionDescription();
 	virtual int getNumberOfLevels();
 	virtual void fillInput(float[], Image*, int, int);
-	double* getColorPCA(int,int,int,int);
+	double getColorPCA(int,int,int,int,int,int);
 	void setColorPCA(std::string,int);
 	void save();
 	bool isCompatible(ArffConfiguration*);
-	double* rgb2HSL(int, int, int);
-	double* rgb2HSV(int, int, int);
-	double* rgb2XYZ(int, int, int);
-	double* rgb2YCbCr(int, int, int);
-	double* rgb2LAB(int, int, int);
-	double* rgb2LUV(int, int, int);
 	int getDimension();
 	void preprocess(Image*);
 protected:
+	std::string processLine(std::string);
+	int switchSpace(std::string);
+	double resolvEquation(std::string);
+	int numBase(int);
+	void rgb2HSL(int, int, int,double [3]);
+	void rgb2HSV(int, int, int,double [3]);
+	void rgb2XYZ(int, int, int,double [3]);
+	void rgb2YCbCr(int, int, int,double [3]);
+	void rgb2LAB(int, int, int,double [3]);
+	void rgb2LUV(int, int, int,double [3]);
+	void convertChannel(double*, int, int, int, int);
 	int windowSize;
 	colorPCA colorSpacePCA;
 	int numberOfLevels;
@@ -98,7 +105,6 @@ protected:
 	void setNumberOfLevels(int);
 	void setWindowSize(int);
 	double getNormalizedChannel(int, double);
-	double convertChannel(int, int, int, int, int);
 
 };
 
