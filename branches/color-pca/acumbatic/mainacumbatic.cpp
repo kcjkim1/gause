@@ -235,9 +235,20 @@ int main(int argc, const char* argv[]) {
              */
             TrainingSet *ts = NULL;
             if (arffflag) {
+                cout << "Runing from arff file PCA based" << endl;
             	ArffConfiguration *arffCf = new ArffConfiguration(levels,windowSize);
                 ts
-                        = new ArffTrainingSet(arfffile,arffCf,10);
+                        = new ArffTrainingSet(arfffile,arffCf,horatio);
+
+                NeuralNetwork *nn;
+                nn = new NeuralNetwork(hidden, arffCf);
+                nn->train(ts, trainingIterations, epochs, epochsBetweenReports,
+                                       thresholdStep);
+                nn->save();
+                arffCf->save();
+                delete ts;
+                delete arffCf;
+                delete nn;
             } else {
                 SerialConfiguration *extant = NULL;
                 SerialConfiguration *cf = new SerialConfiguration(colorSpace, levels,

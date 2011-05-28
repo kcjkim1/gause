@@ -111,7 +111,8 @@ double ArffConfiguration::getColorPCA(int channel, int r, int g, int b,
 			} else if (esp == POS_H) {
 				ss << pos_hor;
 			} else {
-				ss << roundtol(convCanal[esp - numBase(esp)]);
+				ss << getNormalizedChannel(esp,convCanal[esp - numBase(esp)]);
+				//ss << roundtol(convCanal[esp - numBase(esp)]);
 			}
 			line.replace(i, 5, ss.str());
 		}
@@ -155,10 +156,10 @@ int ArffConfiguration::numBase(int reference) {
 	}
 }
 
-double ArffConfiguration::resolvEquation(std::string line) {
+double ArffConfiguration::resolvEquation(string line) {
 	double result;
 	double a, b;
-	std::string number;
+	string number;
 	bool flagfim = true;
 	int cont = 0;
 	while (flagfim) {
@@ -573,7 +574,7 @@ void ArffConfiguration::convertChannel(double espace[3], int outSpace, int r,
 	}
 }
 
-int switchSpace(std::string espaco) {
+int ArffConfiguration::switchSpace(std::string espaco) {
 	if (espaco.compare("RGB_R") == 0) {
 		return 0;
 	} else if (espaco.compare("RGB_G") == 0) {
@@ -770,7 +771,8 @@ void ArffConfiguration::preprocess(Image*) {
 }
 
 std::string ArffConfiguration::getColorSpaceAndPositionDescription() {
-	return "Custom Color Space extracted from Principal Component Analyse";
+	 std::string description = "PCA";
+	    return description;
 }
 
 void ArffConfiguration::fillInput(float[], Image*, int, int) {
