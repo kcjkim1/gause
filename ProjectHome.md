@@ -1,0 +1,5 @@
+The tuning of image segmenters to detect different materials captured in a digital image is usually performed in a manual fashion or taking advantage of little automation. Obtaining
+such segmenters using a machine learning technique usually involves the following tasks: building an manually segmented image set; analyzing the best parameters – color space, color depth, window size, among others; training a classifier that decides whether a pixel belongs or not to the surface of the material. Since segmentation is usually an intermediate step to many applications of Computer Vision and Image Processing, the lack of automation leads to effort lost in a secondary task. This is the project which hosts the code used in the prototype that automatically adjust image segmenters based on color and texture information, using artificial neural net-
+works as classifiers, Gabor filters as texture descriptors and an adapted floodfill algorithm as a post-processing step. The parameters of the Gabor filters and of the adapted floodfill are determined using a genetic algorithm.
+
+Extraced from CARDOSO, Fernando H. B. (2009) M.Sc. thesis.
